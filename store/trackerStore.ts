@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { supabase } from '../utils/supabase';
-import { CODE_OF_HONOR } from '../constants/rules';
 
 export type ImpactType = 'POINTS' | 'DEBT';
 export type TimeModifier = 'DOUBLE_BEFORE_6AM' | 'NONE';
@@ -12,11 +11,9 @@ export interface Rule {
   impact_type: ImpactType;
   base_value: number;
   iconName: string;
-  
   requires_input?: boolean;
-  input_step?: number; // e.g. 10 for "per 10€"
+  input_step?: number;
   time_modifier?: TimeModifier;
-  
   daily_max?: number;
   weekly_max?: number;
   free_uses_per_week?: number;
@@ -32,11 +29,22 @@ export interface ActionEntry {
   is_cancelled?: boolean;
 }
 
-export const getLocalISODate = (date: Date) => {
+export const getISODate = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+export const getLogicalDate = (date: Date) => {
+  // Points boundary is 0:00 (Midnight)
+  return getISODate(date);
+};
+
+export const getGmDate = (date: Date) => {
+  // GM boundary is 4:00 AM
+  const logicalNow = new Date(date.getTime() - 4 * 60 * 60 * 1000);
+  return getISODate(logicalNow);
 };
 
 interface TrackerState {
@@ -46,11 +54,14 @@ interface TrackerState {
   myDebt: number; // Euro debt
   myWeeklyDebt: number;
   myTotalDebt: number;
+  myUnpaidWeeklyDebt: number;
   opponentPoints: number;
   opponentWeeklyDebt: number;
   opponentTotalDebt: number;
+  opponentUnpaidWeeklyDebt: number;
   opponentUserId: string | null;
   opponentName: string | null;
+  opponentIsOnline: boolean;
   rules: Rule[];
   actionEntries: ActionEntry[];
   opponentActionEntries: ActionEntry[];
@@ -60,6 +71,7 @@ interface TrackerState {
   lastSettlementDate: string | null;
   lastWeeklyResetDate: string | null;
   lastGmDate: string | null;
+  lastLatePayDate: string | null;
 
   fetchState: (userId: string) => Promise<void>;
   setupRealtimeSync: (userId: string) => void;
@@ -67,41 +79,45 @@ interface TrackerState {
   logAction: (rule: Rule, multiplier?: number) => void;
   undoAction: (actionId: string) => void;
   adjustDebt: (type: 'WEEKLY' | 'TOTAL', newAmount: number) => Promise<void>;
+  settleWeeklyDebt: () => Promise<void>;
   resetDay: () => void;
   
-  checkAndRunSettlement: () => void;
+  checkAndRunSettlement: () => Promise<void>;
   logGm: (wakeTime: Date) => void;
   updateGm: (wakeTime: Date) => void;
-  resetGm: () => void; // For testing
+  resetGm: () => void;
   setOpponentPoints: (points: number) => void;
 }
 
 export const useTrackerStore = create<TrackerState>((set, get) => ({
   userId: null,
   userName: null,
-  myPoints: 5, // Starts at +5 daily
+  myPoints: 5,
   myDebt: 0,
   myWeeklyDebt: 0,
   myTotalDebt: 0,
+  myUnpaidWeeklyDebt: 0,
   opponentPoints: 7, 
   opponentWeeklyDebt: 0,
   opponentTotalDebt: 0,
+  opponentUnpaidWeeklyDebt: 0,
   opponentUserId: null,
   opponentName: null,
+  opponentIsOnline: false,
   rules: [],
   actionEntries: [],
   opponentActionEntries: [],
-  isLoading: false,
+  isLoading: true,
   isOnline: false,
   
   lastSettlementDate: null,
   lastWeeklyResetDate: null,
   lastGmDate: null,
+  lastLatePayDate: null,
 
   fetchState: async (userId: string) => {
     set({ isLoading: true });
-    // Try to fetch existing state
-    const { data, error } = await supabase.from('user_stats').select('*').eq('user_id', userId).single();
+    const { data, error } = await supabase.from('user_stats').select('*').eq('user_id', userId).maybeSingle();
     
     if (data) {
       set({
@@ -109,40 +125,45 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         myDebt: data.my_debt ?? 0,
         myWeeklyDebt: data.my_weekly_debt ?? 0,
         myTotalDebt: data.my_total_debt ?? 0,
+        myUnpaidWeeklyDebt: data.unpaid_weekly_debt ?? 0,
         lastSettlementDate: data.last_settlement_date,
         lastWeeklyResetDate: data.last_weekly_reset_date,
         lastGmDate: data.last_gm_date,
+        lastLatePayDate: data.last_late_pay_date,
         userName: data.name,
       });
     } else {
-      // Initialize if missing
       await supabase.from('user_stats').insert({
         user_id: userId,
         my_points: 5,
         my_debt: 0,
         my_weekly_debt: 0,
-        my_total_debt: 0
+        my_total_debt: 0,
+        unpaid_weekly_debt: 0
+      });
+      set({
+         myPoints: 5,
+         myDebt: 0,
+         myWeeklyDebt: 0,
+         myTotalDebt: 0,
+         myUnpaidWeeklyDebt: 0
       });
     }
 
-    // Fetch opponent stats
     const { data: opponentData } = await supabase.from('user_stats').select('*').neq('user_id', userId).maybeSingle();
     if (opponentData) {
       set({
         opponentPoints: opponentData.my_points ?? 5,
         opponentWeeklyDebt: opponentData.my_weekly_debt ?? 0,
         opponentTotalDebt: opponentData.my_total_debt ?? 0,
+        opponentUnpaidWeeklyDebt: opponentData.unpaid_weekly_debt ?? 0,
         opponentName: opponentData.name ?? 'Opponent',
         opponentUserId: opponentData.user_id ?? null,
       });
     }
 
-    // Fetch today's actions for both
     const now = new Date();
-    const logicalNow = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-    const todayStr = getLocalISODate(logicalNow);
-    // Rough start of logical day in timestamp to avoid fetching whole history
-    const startOfLogicalDay = new Date(now).setHours(0,0,0,0) - 24 * 60 * 60 * 1000; 
+    const startOfLogicalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); 
     
     const { data: actionsData } = await supabase.from('action_entries')
       .select('*')
@@ -155,17 +176,32 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       });
     }
 
+    await get().checkAndRunSettlement();
+    
     set({ isLoading: false });
   },
 
   setupRealtimeSync: (userId: string) => {
     supabase.channel('public:user_stats')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_stats' }, (payload) => {
-        if (payload.new.user_id !== userId) {
+        if (payload.new.user_id === userId) {
+          set({
+            myPoints: payload.new.my_points ?? 5,
+            myDebt: payload.new.my_debt ?? 0,
+            myWeeklyDebt: payload.new.my_weekly_debt ?? 0,
+            myTotalDebt: payload.new.my_total_debt ?? 0,
+            myUnpaidWeeklyDebt: payload.new.unpaid_weekly_debt ?? 0,
+            lastSettlementDate: payload.new.last_settlement_date,
+            lastWeeklyResetDate: payload.new.last_weekly_reset_date,
+            lastGmDate: payload.new.last_gm_date,
+            lastLatePayDate: payload.new.last_late_pay_date,
+          });
+        } else {
           set({
             opponentPoints: payload.new.my_points ?? 5,
             opponentWeeklyDebt: payload.new.my_weekly_debt ?? 0,
             opponentTotalDebt: payload.new.my_total_debt ?? 0,
+            opponentUnpaidWeeklyDebt: payload.new.unpaid_weekly_debt ?? 0,
             opponentName: payload.new.name ?? 'Opponent',
             opponentUserId: payload.new.user_id ?? null,
           });
@@ -177,56 +213,62 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     supabase.channel('public:action_entries')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'action_entries' }, (payload) => {
-        if (payload.new.user_id !== userId) {
-          const state = get();
-          set({
-            opponentActionEntries: [...state.opponentActionEntries, payload.new as ActionEntry],
-          });
+        const state = get();
+        if (payload.new.user_id === userId) {
+          if (!state.actionEntries.find(e => e.timestamp === payload.new.timestamp)) {
+             set({ actionEntries: [...state.actionEntries, payload.new as ActionEntry] });
+          }
+        } else {
+          set({ opponentActionEntries: [...state.opponentActionEntries, payload.new as ActionEntry] });
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'action_entries' }, (payload) => {
-        if (payload.new.user_id !== userId) {
-          const state = get();
-          set({
-            opponentActionEntries: state.opponentActionEntries.map(e => e.timestamp === payload.new.timestamp ? payload.new as ActionEntry : e),
-          });
+        const state = get();
+        if (payload.new.user_id === userId) {
+          set({ actionEntries: state.actionEntries.map(e => e.timestamp === payload.new.timestamp ? payload.new as ActionEntry : e) });
+        } else {
+          set({ opponentActionEntries: state.opponentActionEntries.map(e => e.timestamp === payload.new.timestamp ? payload.new as ActionEntry : e) });
         }
       })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'action_entries' }, (payload) => {
-         const state = get();
-         // If REPLICA IDENTITY FULL isn't on, payload.old only has the primary key (id).
-         // Fallback to filtering by id if present, or timestamp.
-         if (payload.old && payload.old.id) {
-           set({
-             opponentActionEntries: state.opponentActionEntries.filter(e => e.id !== payload.old.id),
-           });
-         } else if (payload.old && payload.old.timestamp) {
-           set({
-             opponentActionEntries: state.opponentActionEntries.filter(e => e.timestamp !== payload.old.timestamp),
-           });
-         }
-      })
       .subscribe();
+
+    const roomOne = supabase.channel('online-users');
+    roomOne.on('presence', { event: 'sync' }, () => {
+      const state = get();
+      const newState = roomOne.presenceState();
+      let oppIsOnline = false;
+      for (const [key, value] of Object.entries(newState)) {
+        // @ts-ignore
+        if (value.some(v => v.user_id === state.opponentUserId)) {
+          oppIsOnline = true;
+          break;
+        }
+      }
+      set({ opponentIsOnline: oppIsOnline });
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await roomOne.track({
+          user_id: userId,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
   },
 
   setOpponentPoints: (points: number) => set({ opponentPoints: points }),
   
   fetchRules: async () => {
-    set({ isLoading: true });
     const { data, error } = await supabase.from('action_rules').select('*');
-    
     if (error) {
       console.error('Error fetching rules:', error);
-      set({ isLoading: false });
       return;
     }
-    
     const mappedRules = data.map(r => ({
       ...r,
-      iconName: r.icon_name, // Map DB snake_case to camelCase
+      iconName: r.icon_name,
     })) as Rule[];
-
-    set({ rules: mappedRules, isLoading: false });
+    set({ rules: mappedRules });
   },
   
   checkAndRunSettlement: async () => {
@@ -234,66 +276,100 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (!state.userId) return;
 
     const now = new Date();
-    // "Logical day" changes at 4:00 AM. 
-    const logicalNow = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-    const todayStr = getLocalISODate(logicalNow);
+    const todayStr = getLogicalDate(now);
+    const dayOfWeek = now.getDay();
+
+    let updates: any = {};
+    let localUpdates: any = {};
 
     if (state.lastSettlementDate && state.lastSettlementDate !== todayStr) {
-      // Settlement triggers!
-      const diff = state.myPoints - state.opponentPoints;
+      const diff = state.opponentPoints - state.myPoints;
       let newDebt = 0;
       if (diff > 0 && diff < 10) newDebt = 5;
       else if (diff >= 10 && diff < 20) newDebt = 10;
       else if (diff >= 20) newDebt = 15;
 
-      let newWeeklyDebt = state.myWeeklyDebt + newDebt;
-      let newTotalDebt = state.myTotalDebt;
-      
-      // Monday is day 1. If today is Monday and we haven't reset this week
-      if (logicalNow.getDay() === 1 && state.lastWeeklyResetDate !== todayStr) {
-          if (newWeeklyDebt < 0) {
-            newTotalDebt += newWeeklyDebt; // Subtract negative weekly debt from total
-          }
-          newWeeklyDebt = 0;
-      }
+      const newWeeklyDebt = state.myWeeklyDebt + newDebt;
 
-      const updates = {
-        last_settlement_date: todayStr,
-        last_weekly_reset_date: logicalNow.getDay() === 1 ? todayStr : state.lastWeeklyResetDate,
-        my_points: 5,
-        my_weekly_debt: logicalNow.getDay() === 1 && state.lastWeeklyResetDate !== todayStr ? 0 : newWeeklyDebt,
-        my_total_debt: newTotalDebt,
-        my_debt: state.myDebt + newDebt,
-      };
+      updates.last_settlement_date = todayStr;
+      updates.my_points = 5;
+      updates.my_debt = state.myDebt + newDebt;
+      updates.my_weekly_debt = newWeeklyDebt;
 
-      set({
-        lastSettlementDate: updates.last_settlement_date,
-        lastWeeklyResetDate: updates.last_weekly_reset_date,
-        myPoints: updates.my_points,
-        myWeeklyDebt: updates.my_weekly_debt,
-        myTotalDebt: updates.my_total_debt,
-        myDebt: updates.my_debt,
+      Object.assign(localUpdates, {
+        lastSettlementDate: todayStr,
+        myPoints: 5,
+        myDebt: state.myDebt + newDebt,
+        myWeeklyDebt: newWeeklyDebt
       });
-
-      await supabase.from('user_stats').update(updates).eq('user_id', state.userId);
-
     } else if (!state.lastSettlementDate) {
-      set({ lastSettlementDate: todayStr, lastWeeklyResetDate: todayStr });
-      await supabase.from('user_stats').update({
-        last_settlement_date: todayStr,
-        last_weekly_reset_date: todayStr,
-      }).eq('user_id', state.userId);
+      updates.last_settlement_date = todayStr;
+      localUpdates.lastSettlementDate = todayStr;
+    }
+
+    let currentWeeklyDebt = localUpdates.myWeeklyDebt ?? state.myWeeklyDebt;
+    let currentUnpaid = localUpdates.myUnpaidWeeklyDebt ?? state.myUnpaidWeeklyDebt;
+
+    const getMostRecentMonday = (d: Date) => {
+      const dCopy = new Date(d);
+      const day = dCopy.getDay();
+      const diff = dCopy.getDate() - day + (day === 0 ? -6 : 1);
+      return getISODate(new Date(dCopy.setDate(diff)));
+    };
+    
+    const recentMondayStr = getMostRecentMonday(now);
+
+    if (state.lastWeeklyResetDate !== recentMondayStr) {
+      currentUnpaid += currentWeeklyDebt;
+      currentWeeklyDebt = 0;
+
+      updates.last_weekly_reset_date = recentMondayStr;
+      updates.my_weekly_debt = 0;
+      updates.unpaid_weekly_debt = currentUnpaid;
+
+      Object.assign(localUpdates, {
+        lastWeeklyResetDate: recentMondayStr,
+        myWeeklyDebt: 0,
+        myUnpaidWeeklyDebt: currentUnpaid
+      });
+    }
+
+    if (currentUnpaid > 0) {
+       if (dayOfWeek !== 1) { // Apply stacking penalty every day except Monday
+          if (state.lastLatePayDate !== todayStr) {
+             currentUnpaid += 5; 
+             
+             updates.last_late_pay_date = todayStr;
+             updates.unpaid_weekly_debt = currentUnpaid;
+
+             Object.assign(localUpdates, {
+                lastLatePayDate: todayStr,
+                myUnpaidWeeklyDebt: currentUnpaid
+             });
+          }
+       }
+    } else {
+       if (state.lastLatePayDate !== null) {
+          updates.last_late_pay_date = null;
+          localUpdates.lastLatePayDate = null;
+       }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      set({ ...localUpdates });
+      await supabase.from('user_stats').update(updates).eq('user_id', state.userId);
     }
   },
 
   logGm: async (wakeTime: Date) => {
     const state = get();
     if (!state.userId) return;
+    
+    await get().checkAndRunSettlement();
 
-    const logicalNow = new Date(wakeTime.getTime() - 4 * 60 * 60 * 1000);
-    const todayStr = getLocalISODate(logicalNow);
+    const todayStr = getGmDate(wakeTime); 
 
-    let sleepTax = 5; // Daily base
+    let sleepTax = 5; 
     const hours = wakeTime.getHours();
     const minutes = wakeTime.getMinutes();
     const isWeekend = wakeTime.getDay() === 0 || wakeTime.getDay() === 6;
@@ -311,7 +387,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const timestamp = wakeTime.getTime();
     
-    // DB
     await supabase.from('action_entries').insert({
       user_id: state.userId,
       rule_id: 'sl_1',
@@ -320,18 +395,20 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: 0,
     });
 
+    const newPoints = get().myPoints + sleepTax; 
+    
     await supabase.from('user_stats').update({
-      my_points: state.myPoints + sleepTax,
+      my_points: newPoints,
       last_gm_date: todayStr,
     }).eq('user_id', state.userId);
 
     set({
-      myPoints: state.myPoints + sleepTax,
+      myPoints: newPoints,
       lastGmDate: todayStr,
       actionEntries: [
-        ...state.actionEntries,
+        ...get().actionEntries,
         {
-          id: 'gm_' + todayStr, // Temp local ID
+          id: 'gm_' + todayStr,
           rule_id: 'sl_1',
           timestamp: timestamp,
           points_applied: sleepTax,
@@ -342,8 +419,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   },
 
   updateGm: async (wakeTime: Date) => {
-      const logicalNow = new Date(wakeTime.getTime() - 4 * 60 * 60 * 1000);
-      const todayStr = getLocalISODate(logicalNow);
+      const todayStr = getGmDate(wakeTime);
       await get().undoAction('gm_' + todayStr);
       await get().logGm(wakeTime);
   },
@@ -351,6 +427,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   logAction: async (rule, multiplier = 1) => {
     const state = get();
     if (!state.userId) return;
+
+    await get().checkAndRunSettlement();
 
     let pointsToApply = 0;
     let debtToApply = 0;
@@ -371,7 +449,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const timestamp = Date.now();
 
     const newEntry: ActionEntry = {
-      id: Math.random().toString(), // local fallback
+      id: Math.random().toString(),
       rule_id: rule.id,
       timestamp: timestamp,
       points_applied: pointsToApply,
@@ -379,11 +457,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     };
 
     set({
-      myPoints: state.myPoints + pointsToApply,
-      myDebt: state.myDebt + debtToApply,
-      myWeeklyDebt: state.myWeeklyDebt + debtToApply,
-      myTotalDebt: state.myTotalDebt + debtToApply,
-      actionEntries: [...state.actionEntries, newEntry],
+      myPoints: get().myPoints + pointsToApply,
+      myDebt: get().myDebt + debtToApply,
+      myWeeklyDebt: get().myWeeklyDebt + debtToApply,
+      actionEntries: [...get().actionEntries, newEntry],
     });
 
     await supabase.from('action_entries').insert({
@@ -395,10 +472,9 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     });
 
     await supabase.from('user_stats').update({
-      my_points: state.myPoints + pointsToApply,
-      my_debt: state.myDebt + debtToApply,
-      my_weekly_debt: state.myWeeklyDebt + debtToApply,
-      my_total_debt: state.myTotalDebt + debtToApply,
+      my_points: get().myPoints,
+      my_debt: get().myDebt,
+      my_weekly_debt: get().myWeeklyDebt,
     }).eq('user_id', state.userId);
   },
   
@@ -406,7 +482,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const state = get();
     if (!state.userId) return;
 
-    // gm actions have id 'gm_YYYY-MM-DD', but we can just use the timestamp hack
     const entry = state.actionEntries.find(e => e.id === actionId || (actionId.startsWith('gm_') && e.id === actionId));
     if (!entry) return;
 
@@ -414,7 +489,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       myPoints: state.myPoints - entry.points_applied,
       myDebt: state.myDebt - entry.debt_applied,
       myWeeklyDebt: state.myWeeklyDebt - entry.debt_applied,
-      myTotalDebt: state.myTotalDebt - entry.debt_applied,
       actionEntries: state.actionEntries.map(e => 
         e.id === entry.id ? { ...e, is_cancelled: true } : e
       ),
@@ -429,7 +503,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       my_points: state.myPoints - entry.points_applied,
       my_debt: state.myDebt - entry.debt_applied,
       my_weekly_debt: state.myWeeklyDebt - entry.debt_applied,
-      my_total_debt: state.myTotalDebt - entry.debt_applied,
     }).eq('user_id', state.userId);
   },
   
@@ -477,6 +550,18 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       my_weekly_debt: isWeekly ? newAmount : state.myWeeklyDebt,
       my_total_debt: !isWeekly ? newAmount : state.myTotalDebt,
     }).eq('user_id', state.userId);
+  },
+
+  settleWeeklyDebt: async () => {
+     const state = get();
+     if (!state.userId || state.myUnpaidWeeklyDebt <= 0) return;
+
+     set({ myUnpaidWeeklyDebt: 0, lastLatePayDate: null });
+     
+     await supabase.from('user_stats').update({
+         unpaid_weekly_debt: 0,
+         last_late_pay_date: null
+     }).eq('user_id', state.userId);
   },
 
   resetDay: () => set({ myPoints: 5, myDebt: 0, actionEntries: [] }),

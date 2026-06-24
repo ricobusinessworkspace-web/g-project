@@ -97,8 +97,7 @@ function RootLayoutNav() {
 
   useEffect(() => {
     fetchRules();
-    checkAndRunSettlement();
-  }, [fetchRules, checkAndRunSettlement]);
+  }, [fetchRules]);
 
   // Realtime subscription
   useEffect(() => {

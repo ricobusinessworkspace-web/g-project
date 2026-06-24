@@ -5,7 +5,7 @@ import { useTrackerStore } from '@/store/trackerStore';
 import { Undo2 } from 'lucide-react-native';
 
 export default function StatsScreen() {
-  const { actionEntries, opponentActionEntries, opponentName, myWeeklyDebt, myTotalDebt, rules, undoAction } = useTrackerStore();
+  const { actionEntries, opponentActionEntries, opponentName, myWeeklyDebt, myTotalDebt, myUnpaidWeeklyDebt, rules, undoAction } = useTrackerStore();
 
   const combinedEntries = [
     ...actionEntries.map(e => ({ ...e, isMine: true })),
@@ -28,6 +28,12 @@ export default function StatsScreen() {
               <Text style={styles.debtCardTitle}>Total Debt</Text>
               <Text style={styles.debtCardValue}>{myTotalDebt}€</Text>
             </View>
+            {myUnpaidWeeklyDebt > 0 && (
+              <View style={[styles.debtCard, { backgroundColor: '#3A0000', borderWidth: 1, borderColor: '#FF453A' }]}>
+                <Text style={[styles.debtCardTitle, { color: '#FF453A' }]}>UNPAID + LATE PAY</Text>
+                <Text style={styles.debtCardValue}>{myUnpaidWeeklyDebt}€</Text>
+              </View>
+            )}
           </View>
         </View>
 

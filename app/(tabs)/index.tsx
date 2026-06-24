@@ -1,16 +1,27 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionCard from '@/components/ActionCard';
-import { useTrackerStore, getLocalISODate } from '@/store/trackerStore';
+import { useTrackerStore, getGmDate } from '@/store/trackerStore';
 
 export default function DashboardScreen() {
-  const { myPoints, myDebt, opponentPoints, opponentName, rules, logAction, logGm, updateGm, lastGmDate, resetGm } = useTrackerStore();
+  const { 
+    myPoints, myDebt, opponentPoints, opponentName, rules, 
+    logAction, logGm, updateGm, lastGmDate, resetGm, 
+    isLoading, opponentIsOnline 
+  } = useTrackerStore();
 
   const now = new Date();
-  const logicalNow = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-  const todayStr = getLocalISODate(logicalNow);
+  const todayStr = getGmDate(now);
   const needsGm = lastGmDate !== todayStr;
+
+  if (isLoading) {
+    return (
+      <View style={styles.gmContainer}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+      </View>
+    );
+  }
 
   if (needsGm) {
     return (
@@ -23,8 +34,8 @@ export default function DashboardScreen() {
     );
   }
 
-  const diff = myPoints - opponentPoints;
-  const isWinning = diff <= 0; // Less points is better
+  const diff = opponentPoints - myPoints;
+  const isWinning = diff >= 0; 
   const oppName = opponentName || 'Opponent';
   const diffText = diff === 0 
     ? `Tied with ${oppName}` 
@@ -47,6 +58,7 @@ export default function DashboardScreen() {
           <Text style={styles.mainScore}>{myPoints}</Text>
           
           <View style={styles.diffBadge}>
+            {opponentIsOnline && <View style={styles.onlineDot} />}
             <Text style={styles.diffText}>{diffText}</Text>
           </View>
           
@@ -108,6 +120,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34C759',
+    marginRight: 8,
   },
   diffText: {
     color: '#EBEBF5',

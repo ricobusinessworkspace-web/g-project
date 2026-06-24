@@ -5,7 +5,7 @@ import { useTrackerStore } from '@/store/trackerStore';
 import { Pencil } from 'lucide-react-native';
 
 export default function SettingsScreen() {
-  const { isOnline, userId, myTotalDebt, myWeeklyDebt, opponentName, opponentUserId, opponentTotalDebt, opponentWeeklyDebt, opponentActionEntries, adjustDebt } = useTrackerStore();
+  const { isOnline, userId, myTotalDebt, myWeeklyDebt, myUnpaidWeeklyDebt, opponentName, opponentUserId, opponentTotalDebt, opponentWeeklyDebt, opponentActionEntries, adjustDebt, settleWeeklyDebt } = useTrackerStore();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL'>('TOTAL');
@@ -81,6 +81,21 @@ export default function SettingsScreen() {
                 <Pencil size={16} color="#8E8E93" style={styles.editIcon} />
               </TouchableOpacity>
             </View>
+
+            {myUnpaidWeeklyDebt > 0 && (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.unpaidContainer}>
+                  <View style={styles.row}>
+                    <Text style={[styles.label, { color: '#FF453A' }]}>Unpaid + Late Pay</Text>
+                    <Text style={[styles.debtValue, { color: '#FF453A', fontSize: 22 }]}>{myUnpaidWeeklyDebt}€</Text>
+                  </View>
+                  <TouchableOpacity style={styles.settleButton} onPress={() => settleWeeklyDebt()}>
+                    <Text style={styles.settleButtonText}>I Have Paid This In Real Life</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -235,6 +250,26 @@ const styles = StyleSheet.create({
   },
   editIcon: {
     marginLeft: 8,
+  },
+  unpaidContainer: {
+    backgroundColor: '#3A0000',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#FF453A',
+  },
+  settleButton: {
+    backgroundColor: '#FF453A',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  settleButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
   },
   modalOverlay: {
     flex: 1,
