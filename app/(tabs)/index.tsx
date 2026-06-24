@@ -2,14 +2,14 @@ import React from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionCard from '@/components/ActionCard';
-import { useTrackerStore } from '@/store/trackerStore';
+import { useTrackerStore, getLocalISODate } from '@/store/trackerStore';
 
 export default function DashboardScreen() {
   const { myPoints, myDebt, opponentPoints, opponentName, rules, logAction, logGm, updateGm, lastGmDate, resetGm } = useTrackerStore();
 
   const now = new Date();
   const logicalNow = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-  const todayStr = logicalNow.toISOString().split('T')[0];
+  const todayStr = getLocalISODate(logicalNow);
   const needsGm = lastGmDate !== todayStr;
 
   if (needsGm) {

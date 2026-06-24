@@ -5,7 +5,12 @@ import { useTrackerStore } from '@/store/trackerStore';
 import { Undo2 } from 'lucide-react-native';
 
 export default function StatsScreen() {
-  const { actionEntries, myWeeklyDebt, myTotalDebt, rules, undoAction } = useTrackerStore();
+  const { actionEntries, opponentActionEntries, opponentName, myWeeklyDebt, myTotalDebt, rules, undoAction } = useTrackerStore();
+
+  const combinedEntries = [
+    ...actionEntries.map(e => ({ ...e, isMine: true })),
+    ...opponentActionEntries.map(e => ({ ...e, isMine: false }))
+  ].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -29,12 +34,21 @@ export default function StatsScreen() {
         {/* History Timeline Section */}
         <View style={styles.historySection}>
           <Text style={styles.sectionTitle}>PLAYER HISTORY</Text>
-          {actionEntries.length === 0 ? (
+          {combinedEntries.length === 0 ? (
             <Text style={styles.emptyText}>No actions logged today.</Text>
           ) : (
-            [...actionEntries].reverse().map((entry) => {
+            combinedEntries.map((entry) => {
               const rule = rules.find(r => r.id === entry.rule_id);
-              const ruleName = rule ? rule.name : 'Unknown Action';
+              let ruleName = 'Unknown Action';
+              if (rule) {
+                ruleName = rule.name;
+              } else if (entry.rule_id === 'sl_1') {
+                ruleName = 'Sleep Tax';
+              } else if (entry.rule_id === 'adj_weekly') {
+                ruleName = 'Manual Adjustment: Weekly Debt';
+              } else if (entry.rule_id === 'adj_total') {
+                ruleName = 'Manual Adjustment: Total Debt';
+              }
               
               // Format time from timestamp
               const date = new Date(entry.timestamp);
@@ -45,26 +59,32 @@ export default function StatsScreen() {
                   <View style={styles.historyInfo}>
                     <Text style={styles.historyTime}>{timeString}</Text>
                     <View style={styles.historyDetails}>
-                      <Text style={styles.historyRuleName}>{ruleName}</Text>
+                      <Text style={[styles.historyRuleName, entry.is_cancelled && styles.cancelledText]}>{ruleName}</Text>
+                      <Text style={[styles.playerBadge, entry.isMine ? styles.badgeMine : styles.badgeOpponent]}>
+                        {entry.isMine ? 'You' : (opponentName || 'Opponent')}
+                        {entry.is_cancelled && ' • Cancelled'}
+                      </Text>
                       {entry.points_applied !== 0 && (
-                        <Text style={styles.pointsApplied}>
+                        <Text style={[styles.pointsApplied, entry.is_cancelled && styles.cancelledText]}>
                           {entry.points_applied > 0 ? '+' : ''}{entry.points_applied} Points
                         </Text>
                       )}
                       {entry.debt_applied !== 0 && (
-                        <Text style={styles.debtApplied}>
+                        <Text style={[styles.debtApplied, entry.is_cancelled && styles.cancelledText]}>
                           {entry.debt_applied > 0 ? '+' : ''}{entry.debt_applied}€
                         </Text>
                       )}
                     </View>
                   </View>
                   
-                  <TouchableOpacity 
-                    style={styles.undoButton}
-                    onPress={() => undoAction(entry.id)}
-                  >
-                    <Undo2 color="#8E8E93" size={20} />
-                  </TouchableOpacity>
+                  {entry.isMine && !entry.is_cancelled && (
+                    <TouchableOpacity 
+                      style={styles.undoButton}
+                      onPress={() => undoAction(entry.id)}
+                    >
+                      <Undo2 color="#8E8E93" size={20} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })
@@ -156,7 +176,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 2,
+  },
+  playerBadge: {
+    fontSize: 12,
+    fontWeight: '600',
     marginBottom: 4,
+  },
+  badgeMine: {
+    color: '#0A84FF',
+  },
+  badgeOpponent: {
+    color: '#FF9F0A',
   },
   pointsApplied: {
     color: '#34C759',
@@ -167,6 +198,10 @@ const styles = StyleSheet.create({
     color: '#FF453A',
     fontSize: 14,
     fontWeight: '500',
+  },
+  cancelledText: {
+    textDecorationLine: 'line-through',
+    opacity: 0.5,
   },
   undoButton: {
     padding: 10,

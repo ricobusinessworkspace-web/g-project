@@ -50,7 +50,7 @@ function RootLayoutNav() {
   const fetchRules = useTrackerStore((state) => state.fetchRules);
   const checkAndRunSettlement = useTrackerStore((state) => state.checkAndRunSettlement);
   const fetchState = useTrackerStore((state) => state.fetchState);
-  const setOpponentPoints = useTrackerStore((state) => state.setOpponentPoints);
+  const setupRealtimeSync = useTrackerStore((state) => state.setupRealtimeSync);
   const userId = useTrackerStore((state) => state.userId);
   
   const router = useRouter();
@@ -100,24 +100,11 @@ function RootLayoutNav() {
     checkAndRunSettlement();
   }, [fetchRules, checkAndRunSettlement]);
 
-  // Realtime subscription for opponent points
+  // Realtime subscription
   useEffect(() => {
     if (!userId) return;
-
-    const channel = supabase.channel('public:user_stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, (payload) => {
-        // If the updated row belongs to the opponent
-        const updatedRow = payload.new as any;
-        if (updatedRow && updatedRow.user_id !== userId) {
-          setOpponentPoints(updatedRow.my_points);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId]);
+    setupRealtimeSync(userId);
+  }, [userId, setupRealtimeSync]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

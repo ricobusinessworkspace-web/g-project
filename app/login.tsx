@@ -10,6 +10,10 @@ export default function LoginScreen() {
   const router = useRouter();
 
   async function signInWithEmail() {
+    if (!email || !password) {
+      alert('Please enter both email and password.');
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -25,6 +29,10 @@ export default function LoginScreen() {
   }
 
   async function signUpWithEmail() {
+    if (!email || !password) {
+      alert('Please enter both email and password.');
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signUp({
       email,
