@@ -117,7 +117,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
   fetchState: async (userId: string) => {
     set({ isLoading: true });
-    const { data, error } = await supabase.from('user_stats').select('*').eq('user_id', userId).maybeSingle();
+    const { data, error } = await supabase.from('tracker_user_stats').select('*').eq('user_id', userId).maybeSingle();
     if (error) alert('Select Error: ' + error.message);
     
     if (data) {
@@ -134,7 +134,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         userName: data.name,
       });
     } else {
-      const { error: insertErr } = await supabase.from('user_stats').insert({
+      const { error: insertErr } = await supabase.from('tracker_user_stats').insert({
         user_id: userId,
         my_points: 5,
         my_debt: 0,
@@ -152,7 +152,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       });
     }
 
-    const { data: opponentData } = await supabase.from('user_stats').select('*').neq('user_id', userId).maybeSingle();
+    const { data: opponentData } = await supabase.from('tracker_user_stats').select('*').neq('user_id', userId).maybeSingle();
     if (opponentData) {
       set({
         opponentPoints: opponentData.my_points ?? 5,
@@ -167,7 +167,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const now = new Date();
     const startOfLogicalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); 
     
-    const { data: actionsData, error: actionsError } = await supabase.from('action_entries')
+    const { data: actionsData, error: actionsError } = await supabase.from('tracker_action_entries')
       .select('*')
       .gte('timestamp', startOfLogicalDay);
       
@@ -187,7 +187,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
   setupRealtimeSync: (userId: string) => {
     supabase.channel('public:user_stats')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_stats' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tracker_user_stats' }, (payload) => {
         if (payload.new.user_id === userId) {
           set({
             myPoints: payload.new.my_points ?? 5,
@@ -216,7 +216,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       });
 
     supabase.channel('public:action_entries')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'action_entries' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tracker_action_entries' }, (payload) => {
         const state = get();
         if (payload.new.user_id === userId) {
           if (!state.actionEntries.find(e => e.timestamp === payload.new.timestamp)) {
@@ -226,7 +226,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
           set({ opponentActionEntries: [...state.opponentActionEntries, payload.new as ActionEntry] });
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'action_entries' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tracker_action_entries' }, (payload) => {
         const state = get();
         if (payload.new.user_id === userId) {
           set({ actionEntries: state.actionEntries.map(e => e.timestamp === payload.new.timestamp ? payload.new as ActionEntry : e) });
@@ -263,7 +263,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   setOpponentPoints: (points: number) => set({ opponentPoints: points }),
   
   fetchRules: async () => {
-    const { data, error } = await supabase.from('action_rules').select('*');
+    const { data, error } = await supabase.from('tracker_action_rules').select('*');
     if (error) {
       console.error('Error fetching rules:', error);
       return;
@@ -361,7 +361,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     if (Object.keys(updates).length > 0) {
       set({ ...localUpdates });
-      const { error } = await supabase.from('user_stats').update(updates).eq('user_id', state.userId);
+      const { error } = await supabase.from('tracker_user_stats').update(updates).eq('user_id', state.userId);
       if (error) alert('Settlement Update Error: ' + error.message);
     }
   },
@@ -392,7 +392,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const timestamp = wakeTime.getTime();
     
-    await supabase.from('action_entries').insert({
+    await supabase.from('tracker_action_entries').insert({
       user_id: state.userId,
       rule_id: 'sl_1',
       timestamp: timestamp,
@@ -402,7 +402,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const newPoints = get().myPoints + sleepTax; 
     
-    const { error: updateErr } = await supabase.from('user_stats').update({
+    const { error: updateErr } = await supabase.from('tracker_user_stats').update({
       my_points: newPoints,
       last_gm_date: todayStr,
     }).eq('user_id', state.userId);
@@ -469,7 +469,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       actionEntries: [...get().actionEntries, newEntry],
     });
 
-    const { error: insertActionErr } = await supabase.from('action_entries').insert({
+    const { error: insertActionErr } = await supabase.from('tracker_action_entries').insert({
       user_id: state.userId,
       rule_id: rule.id,
       timestamp: timestamp,
@@ -478,7 +478,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     });
     if (insertActionErr) alert('Insert Action Error: ' + insertActionErr.message);
 
-    const { error: actionErr } = await supabase.from('user_stats').update({
+    const { error: actionErr } = await supabase.from('tracker_user_stats').update({
       my_points: get().myPoints,
       my_debt: get().myDebt,
       my_weekly_debt: get().myWeeklyDebt,
@@ -502,12 +502,12 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       ),
     });
 
-    await supabase.from('action_entries')
+    await supabase.from('tracker_action_entries')
       .update({ is_cancelled: true })
       .eq('user_id', state.userId)
       .eq('timestamp', entry.timestamp);
 
-    await supabase.from('user_stats').update({
+    await supabase.from('tracker_user_stats').update({
       my_points: state.myPoints - entry.points_applied,
       my_debt: state.myDebt - entry.debt_applied,
       my_weekly_debt: state.myWeeklyDebt - entry.debt_applied,
@@ -546,7 +546,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       actionEntries: [...state.actionEntries, newEntry],
     });
 
-    await supabase.from('action_entries').insert({
+    await supabase.from('tracker_action_entries').insert({
       user_id: state.userId,
       rule_id: rule_id,
       timestamp: timestamp,
@@ -554,7 +554,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: debtDiff,
     });
 
-    await supabase.from('user_stats').update({
+    await supabase.from('tracker_user_stats').update({
       my_weekly_debt: isWeekly ? newAmount : state.myWeeklyDebt,
       my_total_debt: !isWeekly ? newAmount : state.myTotalDebt,
     }).eq('user_id', state.userId);
@@ -566,7 +566,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
      set({ myUnpaidWeeklyDebt: 0, lastLatePayDate: null });
      
-     await supabase.from('user_stats').update({
+     await supabase.from('tracker_user_stats').update({
          unpaid_weekly_debt: 0,
          last_late_pay_date: null
      }).eq('user_id', state.userId);

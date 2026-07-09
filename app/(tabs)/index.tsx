@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionCard from '@/components/ActionCard';
 import { useTrackerStore, getGmDate } from '@/store/trackerStore';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence } from 'react-native-reanimated';
 
 export default function DashboardScreen() {
   const { 
@@ -10,6 +11,25 @@ export default function DashboardScreen() {
     logAction, logGm, updateGm, lastGmDate, resetGm, 
     isLoading, opponentIsOnline 
   } = useTrackerStore();
+
+  const scale = useSharedValue(1);
+  const prevPoints = useSharedValue(myPoints);
+
+  useEffect(() => {
+    if (prevPoints.value !== myPoints) {
+      scale.value = withSequence(
+        withSpring(1.3, { damping: 2, stiffness: 80 }),
+        withSpring(1)
+      );
+      prevPoints.value = myPoints;
+    }
+  }, [myPoints]);
+
+  const animatedScoreStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
 
   const now = new Date();
   const todayStr = getGmDate(now);
@@ -55,7 +75,7 @@ export default function DashboardScreen() {
         {/* Header / Main Score */}
         <View style={styles.scoreSection}>
           <Text style={styles.headerTitle}>Account</Text>
-          <Text style={styles.mainScore}>{myPoints}</Text>
+          <Animated.Text style={[styles.mainScore, animatedScoreStyle]}>{myPoints}</Animated.Text>
           
           <View style={styles.diffBadge}>
             {opponentIsOnline && <View style={styles.onlineDot} />}
