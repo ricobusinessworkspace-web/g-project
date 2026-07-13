@@ -185,7 +185,9 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     set({ isLoading: false });
   },
 
-  setupRealtimeSync: (userId: string) => {
+  setupRealtimeSync: async (userId: string) => {
+    await supabase.removeAllChannels();
+
     supabase.channel('public:user_stats')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tracker_user_stats' }, (payload) => {
         if (payload.new.user_id === userId) {
