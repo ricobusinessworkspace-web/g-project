@@ -8,6 +8,9 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useTrackerStore } from '@/store/trackerStore';
 import { supabase } from '@/utils/supabase';
+import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, TouchableOpacity } from 'react-native';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -56,8 +59,28 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState<boolean | null>(null);
 
   useEffect(() => {
+    const checkBiometrics = async () => {
+      try {
+        const enabled = await AsyncStorage.getItem('biometricsEnabled');
+        if (enabled === 'true') {
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Unlock Accountability Tracker',
+            fallbackLabel: 'Use Passcode',
+          });
+          setIsUnlocked(result.success);
+        } else {
+          setIsUnlocked(true);
+        }
+      } catch (e) {
+        console.error(e);
+        setIsUnlocked(true);
+      }
+    };
+    checkBiometrics();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         useTrackerStore.setState({ userId: session.user.id });
@@ -104,6 +127,29 @@ function RootLayoutNav() {
     if (!userId) return;
     setupRealtimeSync(userId);
   }, [userId, setupRealtimeSync]);
+
+  if (isUnlocked === null) {
+    return null;
+  }
+
+  if (isUnlocked === false) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#fff', fontSize: 20, marginBottom: 20 }}>App is Locked</Text>
+        <TouchableOpacity 
+          style={{ padding: 16, backgroundColor: '#FF453A', borderRadius: 12 }} 
+          onPress={async () => {
+             const result = await LocalAuthentication.authenticateAsync({
+               promptMessage: 'Unlock Accountability Tracker',
+               fallbackLabel: 'Use Passcode',
+             });
+             if (result.success) setIsUnlocked(true);
+          }}>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Unlock with Biometrics</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

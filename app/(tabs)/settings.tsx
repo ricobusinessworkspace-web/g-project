@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTrackerStore } from '@/store/trackerStore';
-import { Pencil } from 'lucide-react-native';
+import { Pencil, ShieldCheck, Fingerprint } from 'lucide-react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
   const { isOnline, userId, myTotalDebt, myWeeklyDebt, myUnpaidWeeklyDebt, opponentName, opponentUserId, opponentTotalDebt, opponentWeeklyDebt, opponentActionEntries, adjustDebt, settleWeeklyDebt } = useTrackerStore();
@@ -10,6 +12,50 @@ export default function SettingsScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL'>('TOTAL');
   const [editValue, setEditValue] = useState('');
+  const [role, setRole] = useState<'agent' | 'admin' | 'developer'>('agent');
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [clickCount, setClickCount] = useState(0);
+
+  useEffect(() => {
+    // Check if device supports biometrics
+    LocalAuthentication.hasHardwareAsync().then(hasHardware => {
+      if (hasHardware) {
+        LocalAuthentication.isEnrolledAsync().then(isEnrolled => {
+          if (isEnrolled) {
+            AsyncStorage.getItem('biometricsEnabled').then(val => {
+              if (val === 'true') setBiometricsEnabled(true);
+            });
+          }
+        });
+      }
+    });
+  }, []);
+
+  const handleDeveloperUnlock = () => {
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+    if (newCount >= 5 && role !== 'developer') {
+      setRole('developer');
+      alert('Developer mode unlocked!');
+    }
+  };
+
+  const handleToggleBiometrics = async () => {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Authenticate to toggle biometrics',
+        fallbackLabel: 'Use Passcode',
+      });
+      if (result.success) {
+        const newValue = !biometricsEnabled;
+        setBiometricsEnabled(newValue);
+        AsyncStorage.setItem('biometricsEnabled', newValue ? 'true' : 'false');
+        alert(newValue ? 'Biometrics enabled' : 'Biometrics disabled');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const openEditModal = (type: 'WEEKLY' | 'TOTAL', currentValue: number) => {
     setEditType(type);
@@ -57,6 +103,30 @@ export default function SettingsScreen() {
               <Text style={styles.label}>User ID</Text>
               <Text style={styles.valueId} numberOfLines={1} ellipsizeMode="middle">{userId || 'Not Logged In'}</Text>
             </View>
+
+            <View style={styles.divider} />
+            
+            <TouchableOpacity style={styles.row} onPress={handleDeveloperUnlock} activeOpacity={0.8}>
+              <Text style={styles.label}>Role</Text>
+              <View style={styles.statusContainer}>
+                {role === 'developer' && <ShieldCheck size={16} color="#0A84FF" style={{ marginRight: 6 }} />}
+                <Text style={[styles.value, role === 'developer' && { color: '#0A84FF', fontWeight: 'bold' }]}>
+                  {role.toUpperCase()}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+            
+            <TouchableOpacity style={styles.row} onPress={handleToggleBiometrics} activeOpacity={0.7}>
+              <Text style={styles.label}>Biometric Login</Text>
+              <View style={styles.statusContainer}>
+                <Fingerprint size={16} color={biometricsEnabled ? '#34C759' : '#8E8E93'} style={{ marginRight: 6 }} />
+                <Text style={[styles.value, biometricsEnabled && { color: '#34C759' }]}>
+                  {biometricsEnabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
