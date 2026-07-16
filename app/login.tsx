@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, Pressable, Text, ActivityIndicator } from 'react-native';
+import { View, TextInput, StyleSheet, Pressable, Text, ActivityIndicator, Image } from 'react-native';
 import { supabase } from '../utils/supabase';
 import { useRouter } from 'expo-router';
 
@@ -49,15 +49,21 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>G Project</Text>
-      <Text style={styles.subtitle}>Sign in to sync your progress.</Text>
+      <View style={styles.card}>
+        <Image 
+          source={require('@/assets/images/icon.png')} 
+          style={styles.logo} 
+          resizeMode="cover"
+        />
+        <Text style={styles.title}>Willkommen zurück</Text>
+        <Text style={styles.subtitle}>Bitte logge dich ein, um fortzufahren.</Text>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          onChangeText={setEmail}
-          value={email}
-          placeholder="email@address.com"
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            onChangeText={setEmail}
+            value={email}
+            placeholder="E-Mail"
           placeholderTextColor="#666"
           autoCapitalize="none"
         />
@@ -82,63 +88,88 @@ export default function LoginScreen() {
           <Text style={styles.buttonTextSecondary}>Sign Up</Text>
         </Pressable>
       </View>
+      </View>
     </View>
   );
 }
+
+import Colors from '@/constants/Colors';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#000',
+    backgroundColor: Colors.dark.background,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    padding: 40,
+    borderRadius: 16,
+    backgroundColor: '#0a0a0c', // Soft black (var(--color-bg-panel))
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.8,
+    shadowRadius: 40,
+    elevation: 10,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.dark.text,
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: 13,
+    color: Colors.dark.muted,
     marginBottom: 32,
     textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: 16,
+    width: '100%',
+    marginBottom: 12,
   },
   input: {
-    backgroundColor: '#1C1C1E',
-    color: '#fff',
+    backgroundColor: Colors.dark.surface,
+    color: Colors.dark.text,
     padding: 16,
     borderRadius: 12,
-    fontSize: 16,
+    fontSize: 15,
   },
   buttonContainer: {
-    marginTop: 16,
+    width: '100%',
+    marginTop: 12,
     gap: 12,
   },
   button: {
-    backgroundColor: '#FF453A',
+    backgroundColor: Colors.dark.tint,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   buttonSecondary: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#333',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   buttonTextSecondary: {
-    color: '#fff',
-    fontSize: 16,
+    color: Colors.dark.tint,
+    fontSize: 14,
     fontWeight: '600',
   },
 });
