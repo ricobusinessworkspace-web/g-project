@@ -1,10 +1,10 @@
-# Accountability Tracker (G-Project) - Project Handover
+# G Project - Project Handover
 
 **To:** Next Developer / Agent
 **From:** Previous Agent
-**Date:** 2026-07-11
+**Date:** 2026-07-15
 
-This document summarizes the current state of the **Accountability Tracker** project, detailing the architecture, recently implemented features, database configurations, and recommended next steps for future development.
+This document summarizes the current state of the **G Project**, detailing the architecture, recently implemented features, database configurations, bug fixes, and recommended next steps for future development.
 
 ## 🏗️ Architecture & Tech Stack
 - **Frontend Framework**: React Native with [Expo](https://expo.dev/) (Expo Router for navigation).
@@ -27,6 +27,12 @@ This document summarizes the current state of the **Accountability Tracker** pro
 
 ### 3. PWA & Routing Fixes
 - Added a `vercel.json` configuration to handle Single Page Application (SPA) routing, resolving the `404 Not Found` errors that occurred when refreshing the app on Vercel.
+
+## 🛠️ Recent Fixes (2026-07-13)
+- **Dependency Reset**: Completely wiped `.expo`, `node_modules`, and `package-lock.json`, and reinstalled fresh dependencies to resolve severe runtime crashes.
+- **TypeScript & Build Errors Resolved**:
+  - Fixed a missing `useEffect` import in `app/(tabs)/settings.tsx` that was causing crashes on the Settings screen.
+  - Fixed a type error in `components/useColorScheme.ts` causing `Type 'undefined' cannot be used as an index type` in `components/Themed.tsx`. The core scheme check now correctly provides a fallback value instead of evaluating to undefined.
 
 ## 🗄️ Database Configuration (Supabase)
 

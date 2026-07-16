@@ -49,7 +49,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Accountability Tracker</Text>
+      <Text style={styles.title}>G Project</Text>
       <Text style={styles.subtitle}>Sign in to sync your progress.</Text>
 
       <View style={styles.inputContainer}>

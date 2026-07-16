@@ -11,6 +11,7 @@ import { supabase } from '@/utils/supabase';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, TouchableOpacity } from 'react-native';
+import EcosystemLoader from '@/components/EcosystemLoader';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -67,7 +68,7 @@ function RootLayoutNav() {
         const enabled = await AsyncStorage.getItem('biometricsEnabled');
         if (enabled === 'true') {
           const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: 'Unlock Accountability Tracker',
+            promptMessage: 'Unlock G Project',
             fallbackLabel: 'Use Passcode',
           });
           setIsUnlocked(result.success);
@@ -140,7 +141,7 @@ function RootLayoutNav() {
           style={{ padding: 16, backgroundColor: '#FF453A', borderRadius: 12 }} 
           onPress={async () => {
              const result = await LocalAuthentication.authenticateAsync({
-               promptMessage: 'Unlock Accountability Tracker',
+               promptMessage: 'Unlock G Project',
                fallbackLabel: 'Use Passcode',
              });
              if (result.success) setIsUnlocked(true);
@@ -153,10 +154,11 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <EcosystemLoader />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="login" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

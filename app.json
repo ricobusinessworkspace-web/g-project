@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "accountability-tracker",
-    "slug": "accountability-tracker",
+    "name": "G Project",
+    "slug": "g-project",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "accountabilitytracker",
+    "scheme": "gproject",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
