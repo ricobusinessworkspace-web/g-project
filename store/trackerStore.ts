@@ -7,7 +7,7 @@ export type TimeModifier = 'DOUBLE_BEFORE_6AM' | 'NONE';
 export interface Rule {
   id: string;
   name: string;
-  category: 'REOCCURING' | 'ONCE_DAILY' | 'SLEEP_TAXES' | 'EXERCISE' | 'RECREATIONAL' | 'SALES' | 'PERSONAL';
+  category: 'REOCCURING' | 'ONCE_DAILY' | 'SLEEP_TAXES' | 'EXERCISE' | 'RECREATIONAL' | 'SALES' | 'PERSONAL' | 'MANDATORY' | 'ABBAUEN' | 'GN' | 'GM';
   impact_type: ImpactType;
   base_value: number;
   iconName: string;
@@ -62,6 +62,14 @@ interface TrackerState {
   opponentUserId: string | null;
   opponentName: string | null;
   opponentIsOnline: boolean;
+  myTripAbroad: boolean;
+  myFamilyTrip: boolean;
+  mySicko: boolean;
+  myGoofFreeDayUsed: string | null;
+  opponentTripAbroad: boolean;
+  opponentFamilyTrip: boolean;
+  opponentSicko: boolean;
+  opponentGoofFreeDayUsed: string | null;
   rules: Rule[];
   actionEntries: ActionEntry[];
   opponentActionEntries: ActionEntry[];
@@ -81,6 +89,10 @@ interface TrackerState {
   adjustDebt: (type: 'WEEKLY' | 'TOTAL', newAmount: number) => Promise<void>;
   settleWeeklyDebt: () => Promise<void>;
   resetDay: () => void;
+  setTripAbroad: (value: boolean) => Promise<void>;
+  setFamilyTrip: (value: boolean) => Promise<void>;
+  setSicko: (value: boolean) => Promise<void>;
+  setGoofFreeDay: (date: string | null) => Promise<void>;
   
   checkAndRunSettlement: () => Promise<void>;
   logGm: (wakeTime: Date) => void;
@@ -104,6 +116,14 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   opponentUserId: null,
   opponentName: null,
   opponentIsOnline: false,
+  myTripAbroad: false,
+  myFamilyTrip: false,
+  mySicko: false,
+  myGoofFreeDayUsed: null,
+  opponentTripAbroad: false,
+  opponentFamilyTrip: false,
+  opponentSicko: false,
+  opponentGoofFreeDayUsed: null,
   rules: [],
   actionEntries: [],
   opponentActionEntries: [],
@@ -132,6 +152,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         lastGmDate: data.last_gm_date,
         lastLatePayDate: data.last_late_pay_date,
         userName: data.name,
+        myTripAbroad: data.trip_abroad ?? false,
+        myFamilyTrip: data.family_trip ?? false,
+        mySicko: data.sicko ?? false,
+        myGoofFreeDayUsed: data.goof_free_day_used ?? null,
       });
     } else {
       const { error: insertErr } = await supabase.from('tracker_user_stats').insert({
@@ -161,6 +185,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         opponentUnpaidWeeklyDebt: opponentData.unpaid_weekly_debt ?? 0,
         opponentName: opponentData.name ?? 'Opponent',
         opponentUserId: opponentData.user_id ?? null,
+        opponentTripAbroad: opponentData.trip_abroad ?? false,
+        opponentFamilyTrip: opponentData.family_trip ?? false,
+        opponentSicko: opponentData.sicko ?? false,
+        opponentGoofFreeDayUsed: opponentData.goof_free_day_used ?? null,
       });
     }
 
@@ -201,6 +229,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
             lastWeeklyResetDate: payload.new.last_weekly_reset_date,
             lastGmDate: payload.new.last_gm_date,
             lastLatePayDate: payload.new.last_late_pay_date,
+            myTripAbroad: payload.new.trip_abroad ?? false,
+            myFamilyTrip: payload.new.family_trip ?? false,
+            mySicko: payload.new.sicko ?? false,
+            myGoofFreeDayUsed: payload.new.goof_free_day_used ?? null,
           });
         } else {
           set({
@@ -210,6 +242,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
             opponentUnpaidWeeklyDebt: payload.new.unpaid_weekly_debt ?? 0,
             opponentName: payload.new.name ?? 'Opponent',
             opponentUserId: payload.new.user_id ?? null,
+            opponentTripAbroad: payload.new.trip_abroad ?? false,
+            opponentFamilyTrip: payload.new.family_trip ?? false,
+            opponentSicko: payload.new.sicko ?? false,
+            opponentGoofFreeDayUsed: payload.new.goof_free_day_used ?? null,
           });
         }
       })
@@ -289,11 +325,18 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     let localUpdates: any = {};
 
     if (state.lastSettlementDate && state.lastSettlementDate !== todayStr) {
-      const diff = state.opponentPoints - state.myPoints;
+      const isExempt = state.myTripAbroad || state.opponentTripAbroad || 
+                       state.mySicko || state.opponentSicko || 
+                       state.myGoofFreeDayUsed === state.lastSettlementDate || 
+                       state.opponentGoofFreeDayUsed === state.lastSettlementDate;
+                       
       let newDebt = 0;
-      if (diff > 0 && diff < 10) newDebt = 5;
-      else if (diff >= 10 && diff < 20) newDebt = 10;
-      else if (diff >= 20) newDebt = 15;
+      if (!isExempt) {
+        const diff = state.myPoints - state.opponentPoints;
+        if (diff > 0 && diff <= 9) newDebt = 5;
+        else if (diff >= 10 && diff <= 19) newDebt = 10;
+        else if (diff >= 20) newDebt = 15;
+      }
 
       const newWeeklyDebt = state.myWeeklyDebt + newDebt;
 
@@ -448,7 +491,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       finalBaseValue *= 2;
     }
 
-    if (rule.impact_type === 'POINTS') {
+    if (rule.id === 'ab_3') {
+      pointsToApply = finalBaseValue;
+      debtToApply = finalBaseValue;
+    } else if (rule.impact_type === 'POINTS') {
       pointsToApply = finalBaseValue;
     } else if (rule.impact_type === 'DEBT') {
       debtToApply = finalBaseValue;
@@ -576,4 +622,32 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
   resetDay: () => set({ myPoints: 5, myDebt: 0, actionEntries: [] }),
   resetGm: () => set({ lastGmDate: null }),
+  
+  setTripAbroad: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myTripAbroad: value });
+    await supabase.from('tracker_user_stats').update({ trip_abroad: value }).eq('user_id', state.userId);
+  },
+  
+  setFamilyTrip: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myFamilyTrip: value });
+    await supabase.from('tracker_user_stats').update({ family_trip: value }).eq('user_id', state.userId);
+  },
+  
+  setSicko: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ mySicko: value });
+    await supabase.from('tracker_user_stats').update({ sicko: value }).eq('user_id', state.userId);
+  },
+  
+  setGoofFreeDay: async (date: string | null) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myGoofFreeDayUsed: date });
+    await supabase.from('tracker_user_stats').update({ goof_free_day_used: date }).eq('user_id', state.userId);
+  },
 }));

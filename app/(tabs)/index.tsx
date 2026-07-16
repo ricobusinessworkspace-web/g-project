@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionCard from '@/components/ActionCard';
 import { useTrackerStore, getGmDate } from '@/store/trackerStore';
@@ -11,6 +11,9 @@ export default function DashboardScreen() {
     logAction, logGm, updateGm, lastGmDate, resetGm, 
     isLoading, opponentIsOnline 
   } = useTrackerStore();
+
+  const [selectedRule, setSelectedRule] = useState<any>(null);
+  const [inputValue, setInputValue] = useState('');
 
   const scale = useSharedValue(1);
   const prevPoints = useSharedValue(myPoints);
@@ -54,12 +57,36 @@ export default function DashboardScreen() {
     );
   }
 
-  const diff = opponentPoints - myPoints;
-  const isWinning = diff >= 0; 
+  const diff = myPoints - opponentPoints; // Updated logic to match Differenzregel
+  const isWinning = diff <= 0; 
   const oppName = opponentName || 'Opponent';
   const diffText = diff === 0 
     ? `Tied with ${oppName}` 
     : `${Math.abs(diff)} point${Math.abs(diff) > 1 ? 's' : ''} ${isWinning ? 'better' : 'worse'} than ${oppName}`;
+
+  const handlePressAction = (rule: any) => {
+    if (rule.requires_input) {
+      setSelectedRule(rule);
+      setInputValue('');
+    } else {
+      logAction(rule);
+    }
+  };
+
+  const submitInput = () => {
+    if (selectedRule) {
+      const val = parseInt(inputValue, 10);
+      if (!isNaN(val) && val > 0) {
+        let multiplier = val;
+        if (selectedRule.input_step) {
+          // If input step is 10, entering 15 gives 2 (round up)
+          multiplier = Math.ceil(val / selectedRule.input_step);
+        }
+        logAction(selectedRule, multiplier);
+      }
+      setSelectedRule(null);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -94,12 +121,41 @@ export default function DashboardScreen() {
             <ActionCard
               key={rule.id}
               rule={rule}
-              onPress={() => logAction(rule)}
+              onPress={() => handlePressAction(rule)}
             />
           ))}
         </View>
 
       </ScrollView>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={!!selectedRule}
+        onRequestClose={() => setSelectedRule(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Value for {selectedRule?.name}</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="number-pad"
+              value={inputValue}
+              onChangeText={setInputValue}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalButton} onPress={() => setSelectedRule(null)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary]} onPress={submitInput}>
+                <Text style={styles.modalButtonTextPrimary}>Submit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -212,6 +268,63 @@ const styles = StyleSheet.create({
   updateGmText: {
     color: '#8E8E93',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalInput: {
+    backgroundColor: '#2C2C2E',
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    borderRadius: 12,
+    padding: 16,
+    width: '100%',
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#2C2C2E',
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#0A84FF',
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonTextPrimary: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

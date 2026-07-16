@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Modal, TextInput, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTrackerStore } from '@/store/trackerStore';
 import { Pencil, ShieldCheck, Fingerprint } from 'lucide-react-native';
@@ -7,7 +7,15 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
-  const { isOnline, userId, myTotalDebt, myWeeklyDebt, myUnpaidWeeklyDebt, opponentName, opponentUserId, opponentTotalDebt, opponentWeeklyDebt, opponentActionEntries, adjustDebt, settleWeeklyDebt } = useTrackerStore();
+  const { 
+    isOnline, userId, myTotalDebt, myWeeklyDebt, myUnpaidWeeklyDebt, 
+    opponentName, opponentUserId, opponentTotalDebt, opponentWeeklyDebt, opponentActionEntries, 
+    adjustDebt, settleWeeklyDebt,
+    myTripAbroad, setTripAbroad,
+    myFamilyTrip, setFamilyTrip,
+    mySicko, setSicko,
+    myGoofFreeDayUsed, setGoofFreeDay
+  } = useTrackerStore();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL'>('TOTAL');
@@ -127,6 +135,58 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>EXEMPTIONS (EQUAL TAXATION)</Text>
+          
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.label}>✈️ Trip Abroad (Goof Free)</Text>
+              <Switch
+                value={myTripAbroad}
+                onValueChange={setTripAbroad}
+                trackColor={{ false: '#39393D', true: '#34C759' }}
+              />
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.row}>
+              <Text style={styles.label}>👨‍👩‍👧 Family Trip (No Sleep Rules)</Text>
+              <Switch
+                value={myFamilyTrip}
+                onValueChange={setFamilyTrip}
+                trackColor={{ false: '#39393D', true: '#34C759' }}
+              />
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.row}>
+              <Text style={styles.label}>🤒 Sicko (Krank)</Text>
+              <Switch
+                value={mySicko}
+                onValueChange={setSicko}
+                trackColor={{ false: '#39393D', true: '#34C759' }}
+              />
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.row}>
+              <Text style={styles.label}>🌴 Use Goof Free Day</Text>
+              <TouchableOpacity
+                style={[styles.smallButton, myGoofFreeDayUsed === new Date().toISOString().split('T')[0] && styles.smallButtonActive]}
+                onPress={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  if (myGoofFreeDayUsed === today) {
+                    setGoofFreeDay(null); // turn off
+                  } else {
+                    setGoofFreeDay(today); // turn on for today
+                  }
+                }}
+              >
+                <Text style={styles.smallButtonText}>
+                  {myGoofFreeDayUsed === new Date().toISOString().split('T')[0] ? 'Active Today' : 'Activate for Today'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -396,5 +456,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  smallButton: {
+    backgroundColor: '#2C2C2E',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  smallButtonActive: {
+    backgroundColor: '#34C759',
+  },
+  smallButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
