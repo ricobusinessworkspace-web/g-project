@@ -120,13 +120,15 @@ export default function Dashboard() {
       {/* Quick Actions */}
       <div style={{ width: '100%' }}>
         <div className="section-title">QUICK ACTIONS</div>
-        {rules.map((rule) => (
-          <ActionCard
-            key={rule.id}
-            rule={rule}
-            onPress={() => handlePressAction(rule)}
-          />
-        ))}
+        <div className="card-list" style={{ marginBottom: 0 }}>
+          {rules.filter(r => r.category === 'REOCCURING' || r.category === 'ONCE_DAILY').map((rule) => (
+            <ActionCard
+              key={rule.id}
+              rule={rule}
+              onPress={() => handlePressAction(rule)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Input Modal */}
