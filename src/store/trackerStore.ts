@@ -394,7 +394,17 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
           for (const action of yesterdayActions) {
             const rule = CODE_OF_HONOR.find(r => r.id === action.rule_id);
             if (rule && rule.category === 'EXERCISE' && !action.is_cancelled) {
-              exerciseCounts[action.rule_id] = (exerciseCounts[action.rule_id] || 0) + 1;
+              const actionDate = new Date(action.timestamp);
+              const isBefore6am = actionDate.getHours() < 6;
+              const factor = rule.time_modifier === 'DOUBLE_BEFORE_6AM' && isBefore6am ? 2 : 1;
+              let multiplier = 1;
+              if (rule.base_value !== 0) {
+                 multiplier = action.points_applied / (rule.base_value * factor);
+                 if (isNaN(multiplier) || multiplier <= 0) multiplier = 1;
+                 multiplier = Math.round(multiplier);
+              }
+
+              exerciseCounts[action.rule_id] = (exerciseCounts[action.rule_id] || 0) + multiplier;
               if (exerciseCounts[action.rule_id] >= 3) {
                 hasSufficientExercise = true;
               }
@@ -592,6 +602,46 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       pointsToApply = finalBaseValue;
     } else if (rule.impact_type === 'DEBT') {
       debtToApply = finalBaseValue;
+    }
+
+    // BONUS DEBT MECHANIC for Pushups and Runs
+    if (rule.id === 'ex_1' || rule.id === 'ex_3') {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      
+      const todayEntries = state.actionEntries.filter(
+        a => a.rule_id === rule.id && a.timestamp >= startOfDay && !a.is_cancelled
+      );
+      
+      let oldMultiplierSum = 0;
+      for (const a of todayEntries) {
+        const actionDate = new Date(a.timestamp);
+        const actionIsBefore6am = actionDate.getHours() < 6;
+        const factor = rule.time_modifier === 'DOUBLE_BEFORE_6AM' && actionIsBefore6am ? 2 : 1;
+        let m = 1;
+        if (rule.base_value !== 0) {
+           m = a.points_applied / (rule.base_value * factor);
+           if (!isNaN(m) && m > 0) oldMultiplierSum += Math.round(m);
+        }
+      }
+      
+      const newMultiplierSum = oldMultiplierSum + multiplier;
+      
+      if (rule.id === 'ex_1') {
+        // Every 5x 100 pushups -> -5 debt
+        const oldBlocks = Math.floor(oldMultiplierSum / 5);
+        const newBlocks = Math.floor(newMultiplierSum / 5);
+        if (newBlocks > oldBlocks) {
+          debtToApply += (newBlocks - oldBlocks) * -5;
+        }
+      } else if (rule.id === 'ex_3') {
+        // Every 10x 1km run -> -10 debt
+        const oldBlocks = Math.floor(oldMultiplierSum / 10);
+        const newBlocks = Math.floor(newMultiplierSum / 10);
+        if (newBlocks > oldBlocks) {
+          debtToApply += (newBlocks - oldBlocks) * -10;
+        }
+      }
     }
 
     const timestamp = Date.now();
