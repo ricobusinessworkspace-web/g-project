@@ -63,6 +63,7 @@ interface TrackerState {
   opponentUserId: string | null;
   opponentName: string | null;
   opponentIsOnline: boolean;
+  opponentLastSettlementDate: string | null;
   myTripAbroad: boolean;
   myFamilyTrip: boolean;
   mySicko: boolean;
@@ -117,6 +118,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   opponentUserId: null,
   opponentName: null,
   opponentIsOnline: false,
+  opponentLastSettlementDate: null,
   myTripAbroad: false,
   myFamilyTrip: false,
   mySicko: false,
@@ -177,6 +179,12 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       });
     }
 
+    const now = new Date();
+    const startOfLogicalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); 
+    
+    // Calculate todayStr exactly how getGmDate does to compare settlement dates
+    const todayStr = new Date(startOfLogicalDay).toISOString().split('T')[0];
+
     const { data: opponentData } = await supabase.from('tracker_user_stats').select('*').neq('user_id', userId).maybeSingle();
     if (opponentData) {
       set({
@@ -190,12 +198,11 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         opponentFamilyTrip: opponentData.family_trip ?? false,
         opponentSicko: opponentData.sicko ?? false,
         opponentGoofFreeDayUsed: opponentData.goof_free_day_used ?? null,
+        opponentLastSettlementDate: opponentData.last_settlement_date,
       });
     }
 
-    const now = new Date();
-    const startOfLogicalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); 
-    
+
     const { data: actionsData, error: actionsError } = await supabase.from('tracker_action_entries')
       .select('*')
       .gte('timestamp', startOfLogicalDay);
@@ -247,6 +254,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
             opponentFamilyTrip: payload.new.family_trip ?? false,
             opponentSicko: payload.new.sicko ?? false,
             opponentGoofFreeDayUsed: payload.new.goof_free_day_used ?? null,
+            opponentLastSettlementDate: payload.new.last_settlement_date,
           });
         }
       })
@@ -411,7 +419,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const todayStr = getGmDate(wakeTime); 
 
-    let sleepTax = 5; // +5 for breathing base tax
+    let sleepTax = 0; // +5 for breathing base tax is already applied during settlement
     const hours = wakeTime.getHours();
     
     // Equal taxation for Family Trip -> No sleep rules

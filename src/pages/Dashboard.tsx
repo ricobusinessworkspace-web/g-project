@@ -5,7 +5,8 @@ import { useTrackerStore, getGmDate } from '../store/trackerStore';
 export default function Dashboard() {
   const { 
     myPoints, myDebt, opponentPoints, opponentName, rules, 
-    logAction, logGm, lastGmDate, isLoading, opponentIsOnline 
+    logAction, logGm, lastGmDate, isLoading, opponentIsOnline,
+    opponentLastSettlementDate
   } = useTrackerStore();
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
@@ -66,7 +67,8 @@ export default function Dashboard() {
     );
   }
 
-  const diff = myPoints - opponentPoints;
+  const displayOpponentPoints = opponentLastSettlementDate === todayStr ? opponentPoints : 5;
+  const diff = myPoints - displayOpponentPoints;
   const isWinning = diff <= 0; 
   const oppName = opponentName || 'Opponent';
   const diffText = diff === 0 
