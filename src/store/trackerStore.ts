@@ -419,27 +419,24 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const todayStr = getGmDate(wakeTime); 
 
-    let sleepTax = 5; 
+    let sleepTax = 5; // +5 for breathing base tax
     const hours = wakeTime.getHours();
-    const minutes = wakeTime.getMinutes();
-    const isWeekend = wakeTime.getDay() === 0 || wakeTime.getDay() === 6;
-
-    if (isWeekend) {
-      if (hours > 12 || (hours === 12 && minutes > 0)) sleepTax += 5;
-      if (hours > 10 || (hours === 10 && minutes > 0)) sleepTax += 10;
-      if (hours > 8 || (hours === 8 && minutes > 0)) sleepTax += 5;
-    } else {
-      if (hours > 10 || (hours === 10 && minutes > 0)) sleepTax += 5;
-      if (hours > 8 || (hours === 8 && minutes > 0)) sleepTax += 5;
-      if (hours > 7 || (hours === 7 && minutes > 0)) sleepTax += 5;
-      if (hours > 5 || (hours === 5 && minutes > 0)) sleepTax += 5;
+    
+    // Equal taxation for Family Trip -> No sleep rules
+    const isFamilyTrip = state.myFamilyTrip || state.opponentFamilyTrip;
+    
+    if (!isFamilyTrip) {
+      if (hours >= 5) sleepTax += 10; // sleepy after 4:59
+      if (hours >= 6) sleepTax += 5;  // every hour...
+      if (hours >= 7) sleepTax += 5;
+      if (hours >= 8) sleepTax += 5;  // ...until 8:00
     }
 
     const timestamp = wakeTime.getTime();
     
     await supabase.from('tracker_action_entries').insert({
       user_id: state.userId,
-      rule_id: 'sl_1',
+      rule_id: 'gm_1', // Using generic gm_1 ID
       timestamp: timestamp,
       points_applied: sleepTax,
       debt_applied: 0,
@@ -460,7 +457,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         ...get().actionEntries,
         {
           id: 'gm_' + todayStr,
-          rule_id: 'sl_1',
+          rule_id: 'gm_1',
           timestamp: timestamp,
           points_applied: sleepTax,
           debt_applied: 0,

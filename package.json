@@ -1,43 +1,26 @@
 {
-  "name": "g-project",
-  "main": "expo-router/entry",
+  "name": "g-project-web",
+  "private": true,
   "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
-    "@expo/metro-runtime": "^56.0.15",
-    "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.108.2",
-    "expo": "~54.0.0",
-    "expo-constants": "~18.0.13",
-    "expo-font": "~14.0.12",
-    "expo-linking": "~8.0.12",
-    "expo-local-authentication": "~17.0.8",
-    "expo-router": "~6.0.24",
-    "expo-splash-screen": "~31.0.13",
-    "expo-status-bar": "~3.0.9",
-    "expo-symbols": "~1.0.8",
-    "expo-web-browser": "~15.0.11",
-    "lucide-react-native": "^1.18.0",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-reanimated": "~4.1.1",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "react-native-svg": "15.12.1",
-    "react-native-url-polyfill": "^3.0.0",
-    "react-native-web": "^0.21.0",
-    "react-native-worklets": "0.5.1",
-    "zustand": "^5.0.14"
+    "lucide-react": "^0.408.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.24.1",
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
-    "@types/react": "~19.1.10",
-    "typescript": "~5.9.2"
-  },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
-  },
-  "private": true
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.3.1"
+  }
 }
