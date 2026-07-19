@@ -70,7 +70,7 @@ export default function Dashboard() {
   const displayOpponentPoints = opponentLastSettlementDate === todayStr ? opponentPoints : 5;
   const diff = myPoints - displayOpponentPoints;
   const isWinning = diff <= 0; 
-  const oppName = opponentName || 'Opponent';
+  const oppName = opponentName || 'Bitch Jigger';
   const diffText = diff === 0 
     ? `Tied with ${oppName}` 
     : `${Math.abs(diff)} point${Math.abs(diff) > 1 ? 's' : ''} ${isWinning ? 'better' : 'worse'} than ${oppName}`;
