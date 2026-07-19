@@ -54,8 +54,8 @@ export default function Dashboard() {
           style={{ width: '220px', background: 'white', color: 'black' }}
           onClick={() => {
             const d = new Date();
-            d.setHours(parseInt(testGmHour) || 0);
-            d.setMinutes(parseInt(testGmMinute) || 0);
+            d.setHours(parseInt(testGmHour, 10) || 0);
+            d.setMinutes(parseInt(testGmMinute, 10) || 0);
             logGm(d);
           }}
         >

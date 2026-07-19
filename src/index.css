@@ -45,6 +45,10 @@ input, button {
   margin: 0 auto;
   padding: 24px 20px;
   min-height: 100vh;
+  border-left: 1px solid var(--card-border);
+  border-right: 1px solid var(--card-border);
+  background: var(--bg-color);
+  position: relative;
 }
 
 /* Typography */
@@ -67,10 +71,12 @@ h1, h2, h3, h4 {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 600px;
   display: flex;
-  justify-content: center;
+  justify-content: space-around;
   align-items: center;
   gap: 40px;
   padding: 16px 20px;

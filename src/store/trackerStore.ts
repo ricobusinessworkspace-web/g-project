@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../utils/supabase';
+import { CODE_OF_HONOR } from '../constants/rules';
 
 export type ImpactType = 'POINTS' | 'DEBT';
 export type TimeModifier = 'DOUBLE_BEFORE_6AM' | 'NONE';
@@ -301,16 +302,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   setOpponentPoints: (points: number) => set({ opponentPoints: points }),
   
   fetchRules: async () => {
-    const { data, error } = await supabase.from('tracker_action_rules').select('*');
-    if (error) {
-      console.error('Error fetching rules:', error);
-      return;
-    }
-    const mappedRules = data.map(r => ({
-      ...r,
-      iconName: r.icon_name,
-    })) as Rule[];
-    set({ rules: mappedRules });
+    set({ rules: CODE_OF_HONOR });
   },
   
   checkAndRunSettlement: async () => {
