@@ -74,19 +74,28 @@ function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
+    
+    if (isRegistering) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) alert(error.message);
+      else alert('Account created! You can now sign in.');
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert(error.message);
+    }
+    
     setLoading(false);
   };
 
   return (
     <div className="container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100vh', gap: '20px' }}>
       <h1 style={{ textAlign: 'center' }}>G Project</h1>
-      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <input 
           type="email" 
           placeholder="Email" 
@@ -102,9 +111,15 @@ function LoginScreen() {
           style={{ padding: '16px', borderRadius: '12px', border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'white' }}
         />
         <button type="submit" disabled={loading} style={{ padding: '16px', borderRadius: '12px', background: 'var(--brand-blue)', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>
-          {loading ? 'Logging in...' : 'Sign In'}
+          {loading ? 'Processing...' : (isRegistering ? 'Sign Up' : 'Sign In')}
         </button>
       </form>
+      <button 
+        onClick={() => setIsRegistering(!isRegistering)} 
+        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', textDecoration: 'underline', cursor: 'pointer', marginTop: '10px' }}
+      >
+        {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+      </button>
     </div>
   );
 }
