@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTrackerStore } from '../store/trackerStore';
 import { Pencil, ShieldCheck } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../utils/supabase';
 
 export default function SettingsPage() {
   const { 
