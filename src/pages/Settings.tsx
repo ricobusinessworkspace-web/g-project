@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTrackerStore } from '../store/trackerStore';
 import { Pencil, ShieldCheck } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function SettingsPage() {
   const { 
@@ -10,25 +11,35 @@ export default function SettingsPage() {
     myTripAbroad, setTripAbroad,
     myFamilyTrip, setFamilyTrip,
     mySicko, setSicko,
-    myGoofFreeDayUsed, setGoofFreeDay
+    myGoofFreeDayUsed, setGoofFreeDay,
+    userName, updateName, myPoints, adjustPoints
   } = useTrackerStore();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL'>('TOTAL');
+  const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS'>('TOTAL');
   const [editValue, setEditValue] = useState('');
 
-  const openEditModal = (type: 'WEEKLY' | 'TOTAL', currentValue: number) => {
+  const openEditModal = (type: 'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS', currentValue: string | number) => {
     setEditType(type);
-    setEditValue(currentValue.toString());
+    setEditValue(currentValue?.toString() || '');
     setEditModalVisible(true);
   };
 
-  const handleSaveDebt = () => {
-    const val = parseInt(editValue, 10);
-    if (!isNaN(val)) {
-      adjustDebt(editType, val);
+  const handleSaveEdit = () => {
+    if (editType === 'NAME') {
+      updateName(editValue);
+    } else if (editType === 'POINTS') {
+      const val = parseInt(editValue, 10);
+      if (!isNaN(val)) adjustPoints(val);
+    } else {
+      const val = parseInt(editValue, 10);
+      if (!isNaN(val)) adjustDebt(editType, val);
     }
     setEditModalVisible(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   const lastAction = opponentActionEntries.length > 0 
@@ -52,6 +63,13 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? '#34C759' : '#FF453A' }} />
               <span className="card-row-value">{isOnline ? 'Online' : 'Offline'}</span>
+            </div>
+          </div>
+          <div className="card-row">
+            <span className="card-row-label">Name</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--card-border)', padding: '4px 8px', borderRadius: '8px' }} onClick={() => openEditModal('NAME', userName || '')}>
+              <span className="card-row-value">{userName || 'Not Set'}</span>
+              <Pencil size={14} color="#8E8E93" />
             </div>
           </div>
           <div className="card-row">
@@ -128,6 +146,13 @@ export default function SettingsPage() {
         <div className="section-title">HIDDEN STATS (YOU)</div>
         <div className="card-list">
           <div className="card-row">
+            <span className="card-row-label">Total Points</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--card-border)', padding: '4px 8px', borderRadius: '8px' }} onClick={() => openEditModal('POINTS', myPoints)}>
+              <span className="card-row-value-accent" style={{ color: 'white' }}>{myPoints} pts</span>
+              <Pencil size={14} color="#8E8E93" />
+            </div>
+          </div>
+          <div className="card-row">
             <span className="card-row-label">Total Accumulated Debt</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--card-border)', padding: '4px 8px', borderRadius: '8px' }} onClick={() => openEditModal('TOTAL', myTotalDebt)}>
               <span className="card-row-value-accent">{myTotalDebt}€</span>
@@ -188,22 +213,33 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Edit Debt Modal */}
+      <div style={{ marginBottom: '80px' }}>
+        <button 
+          style={{ width: '100%', padding: '16px', background: 'transparent', color: 'var(--error-color)', borderRadius: '12px', border: '1px solid var(--error-color)', fontWeight: 'bold', cursor: 'pointer' }}
+          onClick={handleLogout}
+        >
+          Log Out
+        </button>
+      </div>
+
+      {/* Edit Modal */}
       {editModalVisible && (
         <div className="modal-overlay" onClick={() => setEditModalVisible(false)}>
           <div className="modal-content glass" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Adjust {editType === 'WEEKLY' ? 'Weekly' : 'Total'} Debt</h3>
+            <h3 className="modal-title">
+              Adjust {editType === 'WEEKLY' ? 'Weekly Debt' : editType === 'TOTAL' ? 'Total Debt' : editType === 'POINTS' ? 'Total Points' : 'Name'}
+            </h3>
             <input
               autoFocus
               className="modal-input"
-              type="number"
+              type={editType === 'NAME' ? 'text' : 'number'}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveDebt()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
             />
             <div className="modal-actions">
               <button className="modal-btn modal-btn-cancel" onClick={() => setEditModalVisible(false)}>Cancel</button>
-              <button className="modal-btn modal-btn-primary" onClick={handleSaveDebt}>Save</button>
+              <button className="modal-btn modal-btn-primary" onClick={handleSaveEdit}>Save</button>
             </div>
           </div>
         </div>

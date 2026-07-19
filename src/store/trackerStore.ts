@@ -129,6 +129,8 @@ interface TrackerState {
   logAction: (rule: Rule, multiplier?: number) => void;
   undoAction: (actionId: string) => void;
   adjustDebt: (type: 'WEEKLY' | 'TOTAL', newAmount: number) => Promise<void>;
+  adjustPoints: (newAmount: number) => Promise<void>;
+  updateName: (newName: string) => Promise<void>;
   settleWeeklyDebt: () => Promise<void>;
   resetDay: () => void;
   setTripAbroad: (value: boolean) => Promise<void>;
@@ -482,6 +484,15 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       updates.my_weekly_debt = 0;
       updates.unpaid_weekly_debt = currentUnpaid;
 
+      await supabase.from('tracker_action_entries').insert({
+        id: Math.random().toString(),
+        user_id: state.userId,
+        rule_id: 'weekly_reset',
+        timestamp: Date.now(),
+        points_applied: 0,
+        debt_applied: -currentWeeklyDebt, // Weekly debt gets removed, pushed to Unpaid
+      });
+
       Object.assign(localUpdates, {
         lastWeeklyResetDate: recentMondayStr,
         myWeeklyDebt: 0,
@@ -496,6 +507,15 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
              
              updates.last_late_pay_date = todayStr;
              updates.unpaid_weekly_debt = currentUnpaid;
+
+             await supabase.from('tracker_action_entries').insert({
+               id: Math.random().toString(),
+               user_id: state.userId,
+               rule_id: 'late_fee',
+               timestamp: Date.now(),
+               points_applied: 0,
+               debt_applied: 5,
+             });
 
              Object.assign(localUpdates, {
                 lastLatePayDate: todayStr,
@@ -698,7 +718,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     await supabase.from('tracker_action_entries')
       .update({ is_cancelled: true })
       .eq('user_id', state.userId)
-      .eq('timestamp', entry.timestamp);
+      .eq('id', entry.id);
 
     await supabase.from('tracker_user_stats').update({
       my_points: state.myPoints - entry.points_applied,
@@ -751,6 +771,51 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       my_weekly_debt: isWeekly ? newAmount : state.myWeeklyDebt,
       my_total_debt: !isWeekly ? newAmount : state.myTotalDebt,
     }).eq('user_id', state.userId);
+  },
+
+  adjustPoints: async (newAmount: number) => {
+    const state = get();
+    if (!state.userId) return;
+
+    const pointsDiff = newAmount - state.myPoints;
+    if (pointsDiff === 0) return;
+
+    const timestamp = Date.now();
+    const rule_id = 'adj_points';
+
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: rule_id,
+      timestamp: timestamp,
+      points_applied: pointsDiff,
+      debt_applied: 0,
+    };
+
+    set({
+      myPoints: newAmount,
+      actionEntries: [...state.actionEntries, newEntry],
+    });
+
+    await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: rule_id,
+      timestamp: timestamp,
+      points_applied: pointsDiff,
+      debt_applied: 0,
+    });
+
+    await supabase.from('tracker_user_stats').update({
+      my_points: newAmount,
+    }).eq('user_id', state.userId);
+  },
+
+  updateName: async (newName: string) => {
+    const state = get();
+    if (!state.userId || !newName.trim()) return;
+    
+    set({ userName: newName });
+    await supabase.from('tracker_user_stats').update({ name: newName }).eq('user_id', state.userId);
   },
 
   settleWeeklyDebt: async () => {

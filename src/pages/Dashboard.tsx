@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
+import { Undo2 } from 'lucide-react';
 import ActionCard from '../components/ActionCard';
 import { useTrackerStore, getGmDate } from '../store/trackerStore';
 
 export default function Dashboard() {
-  const { 
     myPoints, myWeeklyDebt, opponentPoints, opponentName, rules, 
-    logAction, logGm, lastGmDate, isLoading, opponentIsOnline,
+    logAction, undoAction, logGm, lastGmDate, isLoading, opponentIsOnline,
     opponentLastSettlementDate, userName, actionEntries, opponentActionEntries, opponentLastGmDate
   } = useTrackerStore();
 
@@ -19,7 +19,7 @@ export default function Dashboard() {
   const todayStr = getGmDate(now);
   const needsGm = lastGmDate !== todayStr;
 
-  const isOpponent = userName !== 'Rico' && userName !== null;
+  const isOpponent = userName !== 'Rico';
   const welcomeMessage = isOpponent ? 'Welcome Bitch Jigger' : 'Welcome Badman';
 
   if (isLoading) {
@@ -94,8 +94,8 @@ export default function Dashboard() {
     : `${Math.abs(diff)} point${Math.abs(diff) > 1 ? 's' : ''} ${isWinning ? 'better' : 'worse'} than ${oppName}`;
 
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfDay && !a.is_cancelled).map(a => ({...a, isMe: true}));
-  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfDay && !a.is_cancelled).map(a => ({...a, isMe: false}));
+  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfDay).map(a => ({...a, isMe: true}));
+  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfDay).map(a => ({...a, isMe: false}));
   const combinedHistory = [...myTodayActions, ...oppTodayActions].sort((a, b) => b.timestamp - a.timestamp);
 
   const handlePressAction = (rule: any) => {
@@ -139,8 +139,12 @@ export default function Dashboard() {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--card-bg)', padding: '8px 16px', borderRadius: '20px', border: '1px solid var(--card-border)' }}>
-          {opponentIsOnline && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-color)', marginRight: '8px' }} />}
           <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{diffText}</span>
+        </div>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: opponentIsOnline ? '#34C759' : 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '12px', fontWeight: '600' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: opponentIsOnline ? '#34C759' : 'var(--text-secondary)' }} />
+          {opponentIsOnline ? 'Mate is Online' : 'Mate is Offline'}
         </div>
         
         {myWeeklyDebt > 0 && (
@@ -150,19 +154,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ width: '100%', marginBottom: '40px' }}>
-        <div className="section-title">QUICK ACTIONS</div>
-        <div className="card-list" style={{ marginBottom: 0 }}>
-          {rules.filter(r => r.category === 'REOCCURING' || r.category === 'ONCE_DAILY').map((rule) => (
-            <ActionCard
-              key={rule.id}
-              rule={rule}
-              onPress={() => handlePressAction(rule)}
-            />
-          ))}
-        </div>
-      </div>
 
       {/* History Feed */}
       <div style={{ width: '100%' }}>
@@ -173,19 +164,44 @@ export default function Dashboard() {
           ) : (
             combinedHistory.map(entry => {
               const rule = rules.find(r => r.id === entry.rule_id);
-              const ruleName = rule ? rule.name : (entry.rule_id.startsWith('penalty_') ? 'Mandatory Penalty' : 'GM / Unknown');
+              let ruleName = rule ? rule.name : 'Unknown';
+              if (entry.rule_id.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
+              if (entry.rule_id === 'adj_weekly') ruleName = 'Weekly Debt Adjust';
+              if (entry.rule_id === 'adj_total') ruleName = 'Total Debt Adjust';
+              if (entry.rule_id === 'adj_points') ruleName = 'Points Adjust';
+              if (entry.rule_id === 'late_fee') ruleName = 'Late Fee (Unpaid Debt)';
+              if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
+              if (entry.rule_id.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
+              
               const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
               return (
-                <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--card-border)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--card-border)', opacity: entry.is_cancelled ? 0.5 : 1 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
                     <span style={{ fontWeight: '600', color: entry.isMe ? 'white' : 'var(--text-secondary)' }}>
                       {entry.isMe ? 'You' : oppName}: {ruleName}
                     </span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{timeStr}</span>
                   </div>
-                  <div style={{ fontWeight: 'bold', color: entry.points_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)' }}>
-                    {entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontWeight: 'bold', color: entry.points_applied > 0 ? 'var(--error-color)' : (entry.points_applied < 0 ? 'var(--accent-color)' : 'var(--text-secondary)'), textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
+                      {entry.points_applied !== 0 && (
+                        <span>{entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts</span>
+                      )}
+                      {entry.debt_applied !== 0 && (
+                        <span style={{ display: 'block', fontSize: '0.8rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : '#34C759' }}>
+                          {entry.debt_applied > 0 ? '+' : ''}{entry.debt_applied}€ debt
+                        </span>
+                      )}
+                    </div>
+                    {entry.isMe && !entry.is_cancelled && (
+                      <button 
+                        onClick={() => undoAction(entry.id)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--error-color)', cursor: 'pointer', padding: '4px' }}
+                      >
+                        <Undo2 size={18} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
