@@ -4,6 +4,7 @@ import ActionCard from '../components/ActionCard';
 import { useTrackerStore, getGmDate } from '../store/trackerStore';
 
 export default function Dashboard() {
+  const { 
     myPoints, myWeeklyDebt, opponentPoints, opponentName, rules, 
     logAction, undoAction, logGm, lastGmDate, isLoading, opponentIsOnline,
     opponentLastSettlementDate, userName, actionEntries, opponentActionEntries, opponentLastGmDate
