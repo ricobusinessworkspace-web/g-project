@@ -4,7 +4,7 @@ import { useTrackerStore, getGmDate } from '../store/trackerStore';
 
 export default function Dashboard() {
   const { 
-    myPoints, myDebt, opponentPoints, opponentName, rules, 
+    myPoints, myWeeklyDebt, opponentPoints, opponentName, rules, 
     logAction, logGm, lastGmDate, isLoading, opponentIsOnline,
     opponentLastSettlementDate
   } = useTrackerStore();
@@ -112,9 +112,9 @@ export default function Dashboard() {
           <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{diffText}</span>
         </div>
         
-        {myDebt > 0 && (
+        {myWeeklyDebt > 0 && (
           <div style={{ color: 'var(--error-color)', fontSize: '1.2rem', fontWeight: '700', marginTop: '16px' }}>
-            {myDebt}€ Debt
+            {myWeeklyDebt}€ Weekly Debt
           </div>
         )}
       </div>
