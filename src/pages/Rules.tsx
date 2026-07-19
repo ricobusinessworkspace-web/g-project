@@ -7,7 +7,8 @@ export default function RulesPage() {
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
 
-  const categories = [...new Set(rules.map(r => r.category))];
+  const displayRules = rules.filter(r => r.category !== 'GM' || r.id === 'gm_4');
+  const categories = [...new Set(displayRules.map(r => r.category))];
 
   const handlePressAction = (rule: any) => {
     if (rule.requires_input) {
@@ -40,7 +41,7 @@ export default function RulesPage() {
         <div key={category} style={{ marginBottom: '32px' }}>
           <div className="section-title">{category}</div>
           <div className="card-list" style={{ marginBottom: 0 }}>
-            {rules.filter(r => r.category === category).map(rule => (
+            {displayRules.filter(r => r.category === category).map(rule => (
               <ActionCard
                 key={rule.id}
                 rule={rule}

@@ -6,17 +6,21 @@ export default function Dashboard() {
   const { 
     myPoints, myWeeklyDebt, opponentPoints, opponentName, rules, 
     logAction, logGm, lastGmDate, isLoading, opponentIsOnline,
-    opponentLastSettlementDate
+    opponentLastSettlementDate, userName, actionEntries, opponentActionEntries, opponentLastGmDate
   } = useTrackerStore();
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
   const [testGmHour, setTestGmHour] = useState('6');
   const [testGmMinute, setTestGmMinute] = useState('00');
+  const [showWelcome, setShowWelcome] = useState(true);
 
   const now = new Date();
   const todayStr = getGmDate(now);
   const needsGm = lastGmDate !== todayStr;
+
+  const isOpponent = userName !== 'Rico' && userName !== null;
+  const welcomeMessage = isOpponent ? 'Welcome Bitch Jigger' : 'Welcome Badman';
 
   if (isLoading) {
     return (
@@ -67,13 +71,32 @@ export default function Dashboard() {
     );
   }
 
-  const displayOpponentPoints = opponentLastSettlementDate === todayStr ? opponentPoints : 5;
+  let currentSleepTax = 0;
+  const currentHours = now.getHours();
+  if (currentHours >= 5) currentSleepTax += 10;
+  if (currentHours >= 6) currentSleepTax += 5;
+  if (currentHours >= 7) currentSleepTax += 5;
+  if (currentHours >= 8) currentSleepTax += 5;
+
+  let displayOpponentPoints = 5;
+  if (opponentLastSettlementDate === todayStr) {
+    displayOpponentPoints = opponentPoints;
+  }
+  if (opponentLastGmDate !== todayStr) {
+    displayOpponentPoints += currentSleepTax;
+  }
+
   const diff = myPoints - displayOpponentPoints;
   const isWinning = diff <= 0; 
   const oppName = opponentName || 'Bitch Jigger';
   const diffText = diff === 0 
     ? `Tied with ${oppName}` 
     : `${Math.abs(diff)} point${Math.abs(diff) > 1 ? 's' : ''} ${isWinning ? 'better' : 'worse'} than ${oppName}`;
+
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfDay && !a.is_cancelled).map(a => ({...a, isMe: true}));
+  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfDay && !a.is_cancelled).map(a => ({...a, isMe: false}));
+  const combinedHistory = [...myTodayActions, ...oppTodayActions].sort((a, b) => b.timestamp - a.timestamp);
 
   const handlePressAction = (rule: any) => {
     if (rule.requires_input) {
@@ -100,8 +123,16 @@ export default function Dashboard() {
 
   return (
     <div className="container">
+      {/* Welcome Banner */}
+      {showWelcome && (
+        <div style={{ background: 'var(--brand-blue)', color: 'white', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontWeight: 'bold' }}>
+          <span>{welcomeMessage}</span>
+          <button onClick={() => setShowWelcome(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+        </div>
+      )}
+
       {/* Header / Main Score */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '40px', marginBottom: '60px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', marginBottom: '60px' }}>
         <div className="section-title">Account</div>
         <div style={{ fontSize: '120px', fontWeight: '800', letterSpacing: '-4px', margin: '20px 0' }}>
           {myPoints}
@@ -120,7 +151,7 @@ export default function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div style={{ width: '100%' }}>
+      <div style={{ width: '100%', marginBottom: '40px' }}>
         <div className="section-title">QUICK ACTIONS</div>
         <div className="card-list" style={{ marginBottom: 0 }}>
           {rules.filter(r => r.category === 'REOCCURING' || r.category === 'ONCE_DAILY').map((rule) => (
@@ -130,6 +161,36 @@ export default function Dashboard() {
               onPress={() => handlePressAction(rule)}
             />
           ))}
+        </div>
+      </div>
+
+      {/* History Feed */}
+      <div style={{ width: '100%' }}>
+        <div className="section-title">TODAY'S HISTORY</div>
+        <div className="card-list">
+          {combinedHistory.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>No actions tracked today yet.</div>
+          ) : (
+            combinedHistory.map(entry => {
+              const rule = rules.find(r => r.id === entry.rule_id);
+              const ruleName = rule ? rule.name : (entry.rule_id.startsWith('penalty_') ? 'Mandatory Penalty' : 'GM / Unknown');
+              const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              
+              return (
+                <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--card-border)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: '600', color: entry.isMe ? 'white' : 'var(--text-secondary)' }}>
+                      {entry.isMe ? 'You' : oppName}: {ruleName}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{timeStr}</span>
+                  </div>
+                  <div style={{ fontWeight: 'bold', color: entry.points_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)' }}>
+                    {entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

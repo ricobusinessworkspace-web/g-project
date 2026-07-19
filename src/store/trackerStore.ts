@@ -103,6 +103,7 @@ interface TrackerState {
   opponentName: string | null;
   opponentIsOnline: boolean;
   opponentLastSettlementDate: string | null;
+  opponentLastGmDate: string | null;
   myTripAbroad: boolean;
   myFamilyTrip: boolean;
   mySicko: boolean;
@@ -158,6 +159,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   opponentName: null,
   opponentIsOnline: false,
   opponentLastSettlementDate: null,
+  opponentLastGmDate: null,
   myTripAbroad: false,
   myFamilyTrip: false,
   mySicko: false,
@@ -239,6 +241,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         opponentSicko: opponentData.sicko ?? false,
         opponentGoofFreeDayUsed: opponentData.goof_free_day_used ?? null,
         opponentLastSettlementDate: opponentData.last_settlement_date,
+        opponentLastGmDate: opponentData.last_gm_date,
       });
     }
 
@@ -295,6 +298,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
             opponentSicko: payload.new.sicko ?? false,
             opponentGoofFreeDayUsed: payload.new.goof_free_day_used ?? null,
             opponentLastSettlementDate: payload.new.last_settlement_date,
+            opponentLastGmDate: payload.new.last_gm_date,
           });
         }
       })
@@ -527,6 +531,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const timestamp = wakeTime.getTime();
     
     await supabase.from('tracker_action_entries').insert({
+      id: Math.random().toString(),
       user_id: state.userId,
       rule_id: 'gm_1', // Using generic gm_1 ID
       timestamp: timestamp,
@@ -607,6 +612,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     });
 
     const { error: insertActionErr } = await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
       user_id: state.userId,
       rule_id: rule.id,
       timestamp: timestamp,
