@@ -94,10 +94,18 @@ export default function SettingsPage() {
               className="modal-btn" 
               style={{ 
                 background: myGoofFreeDayUsed === new Date().toISOString().split('T')[0] ? 'var(--accent-color)' : 'var(--card-border)',
-                padding: '8px 16px', flex: 'none', color: 'white' 
+                padding: '8px 16px', flex: 'none', color: 'white',
+                opacity: (myGoofFreeDayUsed && myGoofFreeDayUsed !== new Date().toISOString().split('T')[0] && myGoofFreeDayUsed.substring(0, 7) === new Date().toISOString().substring(0, 7)) ? 0.5 : 1,
+                cursor: (myGoofFreeDayUsed && myGoofFreeDayUsed !== new Date().toISOString().split('T')[0] && myGoofFreeDayUsed.substring(0, 7) === new Date().toISOString().substring(0, 7)) ? 'not-allowed' : 'pointer'
               }}
               onClick={() => {
                 const today = new Date().toISOString().split('T')[0];
+                const currentMonth = today.substring(0, 7);
+                const usedMonth = myGoofFreeDayUsed ? myGoofFreeDayUsed.substring(0, 7) : null;
+                const isUsedThisMonth = usedMonth === currentMonth && myGoofFreeDayUsed !== today;
+
+                if (isUsedThisMonth) return;
+
                 if (myGoofFreeDayUsed === today) {
                   setGoofFreeDay(null);
                 } else {
@@ -105,7 +113,11 @@ export default function SettingsPage() {
                 }
               }}
             >
-              {myGoofFreeDayUsed === new Date().toISOString().split('T')[0] ? 'Active Today' : 'Activate for Today'}
+              {myGoofFreeDayUsed === new Date().toISOString().split('T')[0] 
+                ? 'Active Today' 
+                : (myGoofFreeDayUsed && myGoofFreeDayUsed.substring(0, 7) === new Date().toISOString().substring(0, 7) 
+                    ? 'Already Used This Month' 
+                    : 'Activate for Today')}
             </button>
           </div>
         </div>

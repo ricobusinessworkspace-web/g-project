@@ -48,6 +48,45 @@ export const getGmDate = (date: Date) => {
   return getISODate(logicalNow);
 };
 
+export const getRuleUsageStats = (entries: ActionEntry[], rule: Rule) => {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  
+  const d = new Date(startOfDay);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const startOfWeek = new Date(d.setDate(diff)).getTime();
+  
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  let daily = 0;
+  let weekly = 0;
+  let monthly = 0;
+
+  for (const entry of entries) {
+    if (entry.rule_id === rule.id && !entry.is_cancelled) {
+      // Calculate units based on base_value. For ABBAUEN the logic is different but they don't have limits.
+      let units = 1;
+      if (rule.impact_type === 'POINTS' && rule.base_value !== 0) {
+        units = Math.abs(entry.points_applied / rule.base_value);
+      } else if (rule.impact_type === 'DEBT' && rule.base_value !== 0) {
+        units = Math.abs(entry.debt_applied / rule.base_value);
+      }
+
+      // Handle the DOUBLE_BEFORE_6AM modifier. If the entry had 2x points, it only counts as 1 use of the exercise rule physically.
+      // Actually, if we use points_applied, a 6AM exercise gives double points, but does it count as double limit? 
+      // User said: "eg -1 30min learning means only -4 points per day can be tracked". 
+      // Let's assume units = points_applied / base_value, except for 6AM exercises which have no daily_max anyway.
+      
+      if (entry.timestamp >= startOfDay) daily += units;
+      if (entry.timestamp >= startOfWeek) weekly += units;
+      if (entry.timestamp >= startOfMonth) monthly += units;
+    }
+  }
+
+  return { daily, weekly, monthly };
+};
+
 interface TrackerState {
   userId: string | null;
   userName: string | null;
@@ -181,6 +220,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const now = new Date();
     const startOfLogicalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); 
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     
     // Calculate todayStr exactly how getGmDate does to compare settlement dates
     const todayStr = new Date(startOfLogicalDay).toISOString().split('T')[0];
@@ -205,7 +245,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const { data: actionsData, error: actionsError } = await supabase.from('tracker_action_entries')
       .select('*')
-      .gte('timestamp', startOfLogicalDay);
+      .gte('timestamp', startOfMonth);
       
     if (actionsError) alert('Fetch Actions Error: ' + actionsError.message);
       
@@ -330,9 +370,61 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
                        state.myGoofFreeDayUsed === state.lastSettlementDate || 
                        state.opponentGoofFreeDayUsed === state.lastSettlementDate;
                        
+      let penaltyPoints = 0;
+      
+      if (!isExempt) {
+        // Fetch actions for the lastSettlementDate
+        const targetDateStart = new Date(state.lastSettlementDate).getTime();
+        const targetDateEnd = targetDateStart + 24 * 60 * 60 * 1000;
+        
+        const { data: yesterdayActions } = await supabase.from('tracker_action_entries')
+          .select('*')
+          .eq('user_id', state.userId)
+          .gte('timestamp', targetDateStart)
+          .lt('timestamp', targetDateEnd);
+          
+        if (yesterdayActions) {
+          // Exercise check
+          let hasSufficientExercise = false;
+          const exerciseCounts: Record<string, number> = {};
+          for (const action of yesterdayActions) {
+            const rule = CODE_OF_HONOR.find(r => r.id === action.rule_id);
+            if (rule && rule.category === 'EXERCISE' && !action.is_cancelled) {
+              exerciseCounts[action.rule_id] = (exerciseCounts[action.rule_id] || 0) + 1;
+              if (exerciseCounts[action.rule_id] >= 3) {
+                hasSufficientExercise = true;
+              }
+            }
+          }
+          if (!hasSufficientExercise) penaltyPoints += 3;
+
+          // Chess check
+          const hasChess = yesterdayActions.some(a => a.rule_id === 'rec_5' && !a.is_cancelled);
+          if (!hasChess) penaltyPoints += 1;
+
+          // Social check
+          const hasSocial = yesterdayActions.some(a => a.rule_id === 'ma_2' && !a.is_cancelled);
+          if (!hasSocial) penaltyPoints += 2;
+        }
+      }
+
+      if (penaltyPoints > 0) {
+        const targetDateStart = new Date(state.lastSettlementDate).getTime();
+        await supabase.from('tracker_action_entries').insert({
+          id: Math.random().toString(),
+          user_id: state.userId,
+          rule_id: 'mandatory_penalty',
+          timestamp: targetDateStart + 24 * 60 * 60 * 1000 - 1000, // 23:59:59
+          points_applied: penaltyPoints,
+          debt_applied: 0,
+        });
+      }
+
+      const finalYesterdayPoints = state.myPoints + penaltyPoints;
+                       
       let newDebt = 0;
       if (!isExempt) {
-        const diff = state.myPoints - state.opponentPoints;
+        const diff = finalYesterdayPoints - state.opponentPoints;
         if (diff > 0 && diff <= 9) newDebt = 5;
         else if (diff >= 10 && diff <= 19) newDebt = 10;
         else if (diff >= 20) newDebt = 15;

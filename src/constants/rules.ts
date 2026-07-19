@@ -5,7 +5,7 @@ export const CODE_OF_HONOR: Rule[] = [
   { id: 'gm_1', name: 'GM Breathing', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Sun' },
   { id: 'gm_2', name: 'Sleepy after 4:59', category: 'GM', impact_type: 'POINTS', base_value: 10, iconName: 'Moon' },
   { id: 'gm_3', name: 'Sleepy every hr', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Clock' },
-  { id: 'gm_4', name: 'Baby Nap', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Bed', free_uses_per_week: 1 },
+  { id: 'gm_4', name: 'Baby Nap', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Bed', free_uses_per_week: 1, daily_max: 1 },
 
   // GN
   { id: 'gn_1', name: 'Before 21:00', category: 'GN', impact_type: 'POINTS', base_value: -1, iconName: 'Moon' },
@@ -16,7 +16,7 @@ export const CODE_OF_HONOR: Rule[] = [
   { id: 're_1', name: 'Rawdog', category: 'REOCCURING', impact_type: 'POINTS', base_value: 1, iconName: 'Smartphone' },
   { id: 're_2', name: 'Bed Goon', category: 'REOCCURING', impact_type: 'POINTS', base_value: 2, iconName: 'Bed' },
   { id: 're_3', name: 'Sex Always', category: 'REOCCURING', impact_type: 'POINTS', base_value: 3, iconName: 'Flame' },
-  { id: 're_5', name: 'Entertainment', category: 'REOCCURING', impact_type: 'POINTS', base_value: 5, iconName: 'MonitorPlay', free_uses_per_week: 1 },
+  { id: 're_5', name: 'Entertainment', category: 'REOCCURING', impact_type: 'POINTS', base_value: 5, iconName: 'MonitorPlay', free_uses_per_week: 1, weekly_max: 1 },
   { id: 're_6', name: 'Nudebabes', category: 'REOCCURING', impact_type: 'DEBT', base_value: 10, iconName: 'Lock' },
   { id: 're_7', name: 'Jerking Off', category: 'REOCCURING', impact_type: 'DEBT', base_value: 10, iconName: 'Hand' },
 
