@@ -254,7 +254,7 @@ export default function Dashboard() {
                           {entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts
                         </div>
                       )}
-                      {entry.debt_applied !== 0 && (
+                      {(entry.debt_applied !== 0 || entry.rule_id === 'weekly_reset' || entry.rule_id === 'late_fee' || entry.rule_id === 'daily_debt_settlement') && (
                         <div style={{ color: entry.debt_applied > 0 ? 'var(--error-color)' : '#34C759', fontWeight: '800', fontSize: '0.85rem', marginTop: '4px' }}>
                           {entry.debt_applied > 0 ? '+' : ''}{entry.debt_applied}€
                         </div>
