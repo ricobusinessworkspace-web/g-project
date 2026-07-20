@@ -16,6 +16,9 @@ export default function Dashboard() {
   const [testGmHour, setTestGmHour] = useState('6');
   const [testGmMinute, setTestGmMinute] = useState('00');
   const [activeDateOffset, setActiveDateOffset] = useState(0);
+  const [pullY, setPullY] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const [startY, setStartY] = useState(0);
 
   const now = new Date();
   const todayStr = getGmDate(now);
@@ -186,10 +189,6 @@ export default function Dashboard() {
       setSelectedRule(null);
     }
   };
-
-  const [pullY, setPullY] = useState(0);
-  const [isPulling, setIsPulling] = useState(false);
-  const [startY, setStartY] = useState(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY === 0) {
