@@ -554,10 +554,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (!entry) return;
 
     set({
-      myPoints: state.myPoints - entry.points_applied,
-      myDebt: state.myDebt - entry.debt_applied,
-      myWeeklyDebt: state.myWeeklyDebt - entry.debt_applied,
-      actionEntries: state.actionEntries.map(e => 
+      myPoints: get().myPoints - entry.points_applied,
+      myDebt: get().myDebt - entry.debt_applied,
+      myWeeklyDebt: get().myWeeklyDebt - entry.debt_applied,
+      actionEntries: get().actionEntries.map(e => 
         e.id === entry.id ? { ...e, is_cancelled: true } : e
       ),
     });
@@ -568,9 +568,9 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       .eq('id', entry.id);
 
     await supabase.from('tracker_user_stats').update({
-      my_points: state.myPoints - entry.points_applied,
-      my_debt: state.myDebt - entry.debt_applied,
-      my_weekly_debt: state.myWeeklyDebt - entry.debt_applied,
+      my_points: get().myPoints,
+      my_debt: get().myDebt,
+      my_weekly_debt: get().myWeeklyDebt,
     }).eq('user_id', state.userId);
   },
   
