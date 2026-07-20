@@ -15,8 +15,10 @@ export default function Performance() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
+  const [chartMode, setChartMode] = useState<'intraday' | 'daily'>('daily');
+
   // 1. Data Preparation: Daily Points (Last 14 Days)
-  const chartData = useMemo(() => {
+  const dailyChartData = useMemo(() => {
     const data = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
@@ -40,6 +42,12 @@ export default function Performance() {
         oppDayDebt += a.debt_applied;
       }
       
+      // If it's today (i===0), the user wants the graph to show 0 until the day is over
+      if (i === 0) {
+        myDayPoints = 0;
+        oppDayPoints = 0;
+      }
+
       data.push({
         name: d.toLocaleDateString('en-US', { weekday: 'short' }),
         fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -51,7 +59,53 @@ export default function Performance() {
       });
     }
     return data;
-  }, [actionEntries, opponentActionEntries, startOfToday, oppName]);
+  }, [actionEntries, opponentActionEntries, now, oppName]);
+
+  // Intraday Data
+  const intradayData = useMemo(() => {
+    const data = [];
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    data.push({
+      time: '00:00',
+      fullDate: '00:00',
+      You: 5,
+      [oppName]: 5
+    });
+
+    let myRunning = 5;
+    let oppRunning = 5;
+
+    const allToday = [...actionEntries, ...opponentActionEntries]
+      .filter(a => a.timestamp >= start && !a.is_cancelled)
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    for (const a of allToday) {
+      if (a.user_id === userId) myRunning += a.points_applied;
+      else oppRunning += a.points_applied;
+
+      const d = new Date(a.timestamp);
+      const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      data.push({
+        time: timeStr,
+        fullDate: timeStr,
+        You: myRunning,
+        [oppName]: oppRunning
+      });
+    }
+
+    const currentStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    data.push({
+      time: currentStr,
+      fullDate: currentStr,
+      You: myRunning,
+      [oppName]: oppRunning
+    });
+
+    return data;
+  }, [actionEntries, opponentActionEntries, now, oppName, userId]);
+
+  const chartDataToUse = chartMode === 'intraday' ? intradayData : dailyChartData;
+  const xAxisKey = chartMode === 'intraday' ? 'time' : 'fullDate';
 
   // 2. Data Preparation: Top / Flop Rules (Last 14 days)
   const ruleStats = useMemo(() => {
@@ -73,8 +127,6 @@ export default function Performance() {
     let topId = null;
     let max = 0;
     Object.keys(ruleStats).forEach(id => {
-      // positive = positive points gained (e.g. +5 for rule break = bad thing, wait.
-      // Top Negative Impact means it gave positive points! Positive Impact means negative points!
       if (ruleStats[id].positive > max && id !== 'gm_1' && id !== 'mandatory_penalty') {
         max = ruleStats[id].positive;
         topId = id;
@@ -87,7 +139,6 @@ export default function Performance() {
     let topId = null;
     let max = 0;
     Object.keys(ruleStats).forEach(id => {
-      // ruleStats[id].negative = absolute value of negative points (good thing)
       if (ruleStats[id].negative > max || ruleStats[id].debt < 0) {
         const score = ruleStats[id].negative + Math.abs(Math.min(ruleStats[id].debt, 0));
         if (score > max) {
@@ -191,10 +242,27 @@ export default function Performance() {
 
       {/* Points Chart */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '24px', padding: '20px 10px', marginBottom: '30px' }}>
-        <h3 style={{ marginLeft: '10px', marginBottom: '20px', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Daily Points</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginLeft: '10px', marginRight: '10px', marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '1.1rem', color: 'var(--text-primary)', margin: 0 }}>Points</h3>
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '4px' }}>
+            <button 
+              onClick={() => setChartMode('intraday')}
+              style={{ background: chartMode === 'intraday' ? 'var(--accent-color)' : 'transparent', color: chartMode === 'intraday' ? 'white' : 'var(--text-secondary)', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              Today
+            </button>
+            <button 
+              onClick={() => setChartMode('daily')}
+              style={{ background: chartMode === 'daily' ? 'var(--accent-color)' : 'transparent', color: chartMode === 'daily' ? 'white' : 'var(--text-secondary)', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              14-Day
+            </button>
+          </div>
+        </div>
+        
         <div style={{ width: '100%', height: 200 }}>
           <ResponsiveContainer>
-            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={chartDataToUse} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorYou" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#34C759" stopOpacity={0.3}/>
@@ -206,11 +274,11 @@ export default function Performance() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="fullDate" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
+              <XAxis dataKey={xAxisKey} stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={chartMode === 'intraday' ? 'preserveStartEnd' : 0} angle={-45} textAnchor="end" height={40} />
               <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="You" stroke="#34C759" strokeWidth={3} fillOpacity={1} fill="url(#colorYou)" />
-              <Area type="monotone" dataKey={oppName} stroke="#0A84FF" strokeWidth={3} fillOpacity={1} fill="url(#colorOpp)" />
+              <Area type={chartMode === 'intraday' ? 'stepAfter' : 'monotone'} dataKey="You" stroke="#34C759" strokeWidth={3} fillOpacity={1} fill="url(#colorYou)" />
+              <Area type={chartMode === 'intraday' ? 'stepAfter' : 'monotone'} dataKey={oppName} stroke="#0A84FF" strokeWidth={3} fillOpacity={1} fill="url(#colorOpp)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -221,7 +289,7 @@ export default function Performance() {
         <h3 style={{ marginLeft: '10px', marginBottom: '20px', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Debt Activity</h3>
         <div style={{ width: '100%', height: 200 }}>
           <ResponsiveContainer>
-            <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={dailyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis dataKey="fullDate" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
               <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
