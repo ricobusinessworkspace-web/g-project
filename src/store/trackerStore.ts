@@ -579,7 +579,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       finalBaseValue *= 2;
     }
 
-    if (rule.id === 'ab_3') {
+    if (rule.category === 'ABBAUEN' || rule.id === 'ab_3') {
       pointsToApply = finalBaseValue;
       debtToApply = finalBaseValue;
     } else if (rule.impact_type === 'POINTS') {
@@ -641,7 +641,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     let newWeeklyDebt = get().myWeeklyDebt;
     let newTotalDebt = get().myTotalDebt;
 
-    if (rule.id === 'ab_3') {
+    if (rule.category === 'ABBAUEN' || rule.id === 'ab_3') {
       // Manual Debt Payoff ALWAYS and ONLY reduces Total Debt
       newTotalDebt += debtToApply; 
     } else {
@@ -683,10 +683,23 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const entry = state.actionEntries.find(e => e.id === actionId || (actionId.startsWith('gm_') && e.id === actionId));
     if (!entry) return;
 
+    const rule = state.rules.find(r => r.id === entry.rule_id);
+    const isAbbauen = rule?.category === 'ABBAUEN' || entry.rule_id === 'ab_3';
+
+    let newWeeklyDebt = get().myWeeklyDebt;
+    let newTotalDebt = get().myTotalDebt;
+
+    if (isAbbauen) {
+      newTotalDebt -= entry.debt_applied;
+    } else {
+      newWeeklyDebt -= entry.debt_applied;
+    }
+
     set({
       myPoints: get().myPoints - entry.points_applied,
       myDebt: get().myDebt - entry.debt_applied,
-      myWeeklyDebt: get().myWeeklyDebt - entry.debt_applied,
+      myWeeklyDebt: newWeeklyDebt,
+      myTotalDebt: newTotalDebt,
       actionEntries: get().actionEntries.map(e => 
         e.id === entry.id ? { ...e, is_cancelled: true } : e
       ),
@@ -701,6 +714,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       my_points: get().myPoints,
       my_debt: get().myDebt,
       my_weekly_debt: get().myWeeklyDebt,
+      my_total_debt: get().myTotalDebt,
     }).eq('user_id', state.userId);
   },
   
