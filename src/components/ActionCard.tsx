@@ -21,11 +21,14 @@ export default function ActionCard({ rule, onPress, hideValue }: ActionCardProps
   const stats = getRuleUsageStats(actionEntries, rule);
   
   let usageText = '';
+  let isMaxReached = false;
   
   if (rule.daily_max) {
     usageText = `${stats.daily}/${rule.daily_max}`;
+    if (stats.daily >= rule.daily_max) isMaxReached = true;
   } else if (rule.weekly_max) {
     usageText = `${stats.weekly}/${rule.weekly_max}`;
+    if (stats.weekly >= rule.weekly_max) isMaxReached = true;
   } else if (rule.free_uses_per_week) {
     usageText = `${stats.weekly}/${rule.free_uses_per_week}`;
   }
@@ -33,12 +36,13 @@ export default function ActionCard({ rule, onPress, hideValue }: ActionCardProps
   return (
     <div 
       className={`card-row`} 
-      onClick={onPress} 
+      onClick={isMaxReached && !hideValue ? undefined : onPress} 
       style={{ 
-        cursor: 'pointer', 
+        cursor: isMaxReached && !hideValue ? 'not-allowed' : 'pointer', 
         display: 'flex', 
         gap: '16px',
-        opacity: 1
+        opacity: isMaxReached ? 0.35 : 1,
+        transition: 'opacity 0.2s ease',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
