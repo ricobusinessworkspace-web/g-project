@@ -228,6 +228,29 @@ export default function Dashboard() {
               
               const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
+              let ptColor = 'var(--text-secondary)';
+              let ptBg = 'rgba(255,255,255,0.05)';
+              let ptSign = '';
+              if (entry.points_applied > 0) {
+                ptColor = 'var(--error-color)';
+                ptBg = 'rgba(255,69,58,0.15)';
+                ptSign = '+';
+              } else if (entry.points_applied < 0) {
+                ptColor = 'var(--accent-color)';
+                ptBg = 'rgba(52,199,89,0.15)';
+              }
+
+              let debtColor = 'var(--text-secondary)';
+              let debtSign = '';
+              if (entry.rule_id !== 'weekly_reset') {
+                if (entry.debt_applied > 0) {
+                  debtColor = 'var(--error-color)';
+                  debtSign = '+';
+                } else if (entry.debt_applied < 0) {
+                  debtColor = 'var(--accent-color)';
+                }
+              }
+
               return (
                 <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--card-bg)', borderRadius: '20px', border: '1px solid var(--card-border)', opacity: entry.is_cancelled ? 0.4 : 1, transition: 'opacity 0.2s ease' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
@@ -250,13 +273,13 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
                       {(entry.points_applied !== 0 || entry.rule_id.startsWith('gm_')) && (
-                        <div style={{ background: entry.points_applied > 0 ? 'rgba(255,69,58,0.15)' : 'rgba(52,199,89,0.15)', color: entry.points_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', padding: '4px 10px', borderRadius: '12px', fontWeight: '800', fontSize: '0.9rem' }}>
-                          {entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts
+                        <div style={{ background: ptBg, color: ptColor, padding: '4px 10px', borderRadius: '12px', fontWeight: '800', fontSize: '0.9rem' }}>
+                          {ptSign}{entry.points_applied} pts
                         </div>
                       )}
                       {(entry.debt_applied !== 0 || entry.rule_id === 'weekly_reset' || entry.rule_id === 'late_fee' || entry.rule_id === 'daily_debt_settlement') && (
-                        <div style={{ color: entry.debt_applied > 0 ? 'var(--error-color)' : '#34C759', fontWeight: '800', fontSize: '0.85rem', marginTop: '4px' }}>
-                          {entry.debt_applied > 0 ? '+' : ''}{entry.debt_applied}€
+                        <div style={{ color: debtColor, fontWeight: '800', fontSize: '0.85rem', marginTop: '4px' }}>
+                          {debtSign}{entry.debt_applied}€
                         </div>
                       )}
                     </div>
