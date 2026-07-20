@@ -94,17 +94,17 @@ export default function Dashboard() {
   const startOfSelectedDay = startOfDay + (activeDateOffset * 86400000);
   const endOfSelectedDay = startOfSelectedDay + 86400000;
 
-  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay).sort((a, b) => a.timestamp - b.timestamp);
+  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled).sort((a, b) => a.timestamp - b.timestamp);
   let myRunning = 5;
   const myActionsWithRunning = myTodayActions.map(a => {
-    if (!a.is_cancelled && a.points_applied !== 0) myRunning += a.points_applied;
+    if (a.points_applied !== 0) myRunning += a.points_applied;
     return { ...a, isMe: true, runningPoints: myRunning };
   });
 
-  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay).sort((a, b) => a.timestamp - b.timestamp);
+  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled).sort((a, b) => a.timestamp - b.timestamp);
   let oppRunning = 5;
   const oppActionsWithRunning = oppTodayActions.map(a => {
-    if (!a.is_cancelled && a.points_applied !== 0) oppRunning += a.points_applied;
+    if (a.points_applied !== 0) oppRunning += a.points_applied;
     return { ...a, isMe: false, runningPoints: oppRunning };
   });
 
