@@ -55,7 +55,7 @@ export default function RulesPage() {
       {/* Input Modal */}
       {selectedRule && (
         <div className="modal-overlay" onClick={() => setSelectedRule(null)}>
-          <div className="modal-content glass" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3 className="modal-title">Enter Value for {selectedRule.name}</h3>
             <input
               autoFocus

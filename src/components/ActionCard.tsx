@@ -31,10 +31,9 @@ export default function ActionCard({ rule, onPress }: ActionCardProps) {
 
   return (
     <div 
-      className={`card-row glass`} 
+      className={`card-row`} 
       onClick={onPress} 
       style={{ 
-        marginBottom: '12px', 
         cursor: 'pointer', 
         display: 'flex', 
         gap: '16px',

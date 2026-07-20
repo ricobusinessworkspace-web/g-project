@@ -186,7 +186,7 @@ export default function Dashboard() {
       {/* Header / Main Score */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', marginBottom: '60px' }}>
         <div className="section-title">Account</div>
-        <div style={{ fontSize: '130px', fontWeight: '700', letterSpacing: '-6px', margin: '10px 0', lineHeight: '1' }}>
+        <div className="tabular-nums" style={{ fontSize: '130px', letterSpacing: '-6px', margin: '10px 0', lineHeight: '1' }}>
           {myPoints}
         </div>
         
@@ -334,7 +334,7 @@ export default function Dashboard() {
       {/* Input Modal */}
       {selectedRule && (
         <div className="modal-overlay" onClick={() => setSelectedRule(null)}>
-          <div className="modal-content glass" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3 className="modal-title">Enter Value for {selectedRule.name}</h3>
             <input
               autoFocus
