@@ -19,9 +19,9 @@ export default function Performance() {
   const chartData = useMemo(() => {
     const data = [];
     for (let i = 13; i >= 0; i--) {
-      const d = new Date(startOfToday - i * 86400000);
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const start = d.getTime();
-      const end = start + 86400000;
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1).getTime();
       
       const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
       const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
@@ -105,14 +105,14 @@ export default function Performance() {
   const pastDays = useMemo(() => {
     const days = [];
     for (let i = 1; i <= 7; i++) { // Show last 7 days history
-      days.push(startOfToday - i * 86400000);
+      days.push(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).getTime());
     }
     return days;
-  }, [startOfToday]);
+  }, [now]);
 
   const renderHistoryFeed = (dateTimestamp: number) => {
     const start = dateTimestamp;
-    const end = start + 86400000;
+    const end = new Date(new Date(start).getFullYear(), new Date(start).getMonth(), new Date(start).getDate() + 1).getTime();
     
     const myDay = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled).map(a => ({...a, isMe: true}));
     const oppDay = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled).map(a => ({...a, isMe: false}));
@@ -206,7 +206,7 @@ export default function Performance() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="name" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
+              <XAxis dataKey="name" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval="preserveStartEnd" />
               <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
               <Tooltip content={<CustomTooltip />} />
               <Area type="monotone" dataKey="You" stroke="#34C759" strokeWidth={3} fillOpacity={1} fill="url(#colorYou)" />
@@ -223,7 +223,7 @@ export default function Performance() {
           <ResponsiveContainer>
             <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="name" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
+              <XAxis dataKey="name" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval="preserveStartEnd" />
               <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
               <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
