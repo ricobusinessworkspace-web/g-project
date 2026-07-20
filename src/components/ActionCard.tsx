@@ -19,30 +19,26 @@ export default function ActionCard({ rule, onPress }: ActionCardProps) {
   
   const stats = getRuleUsageStats(actionEntries, rule);
   
-  let isDisabled = false;
   let usageText = '';
   
   if (rule.daily_max) {
-    isDisabled = stats.daily >= rule.daily_max;
     usageText = `${stats.daily}/${rule.daily_max}`;
   } else if (rule.weekly_max) {
-    isDisabled = stats.weekly >= rule.weekly_max;
     usageText = `${stats.weekly}/${rule.weekly_max}`;
   } else if (rule.free_uses_per_week) {
-    isDisabled = stats.weekly >= rule.free_uses_per_week;
     usageText = `${stats.weekly}/${rule.free_uses_per_week}`;
   }
 
   return (
     <div 
-      className={`card-row glass ${isDisabled ? 'disabled' : ''}`} 
-      onClick={isDisabled ? undefined : onPress} 
+      className={`card-row glass`} 
+      onClick={onPress} 
       style={{ 
         marginBottom: '12px', 
-        cursor: isDisabled ? 'not-allowed' : 'pointer', 
+        cursor: 'pointer', 
         display: 'flex', 
         gap: '16px',
-        opacity: isDisabled ? 0.5 : 1
+        opacity: 1
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>

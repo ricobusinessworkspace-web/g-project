@@ -110,6 +110,27 @@ export default function Dashboard() {
 
   const combinedHistory = [...myActionsWithRunning, ...oppActionsWithRunning].sort((a, b) => b.timestamp - a.timestamp);
 
+  const groupedHistory: any[] = [];
+  for (const entry of combinedHistory) {
+    const lastGroup = groupedHistory[groupedHistory.length - 1];
+    const isSpecial = entry.rule_id.startsWith('adj_') || entry.rule_id.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty' || entry.rule_id === 'late_fee' || entry.rule_id === 'weekly_reset' || entry.rule_id === 'daily_debt_settlement' || entry.rule_id.startsWith('gm_');
+    
+    if (
+      lastGroup && 
+      !isSpecial &&
+      lastGroup.rule_id === entry.rule_id && 
+      lastGroup.isMe === entry.isMe &&
+      lastGroup.is_cancelled === entry.is_cancelled
+    ) {
+      lastGroup.points_applied += entry.points_applied;
+      lastGroup.debt_applied += entry.debt_applied;
+      lastGroup.groupedCount += 1;
+      lastGroup.groupedIds.push(entry.id);
+    } else {
+      groupedHistory.push({ ...entry, groupedCount: 1, groupedIds: [entry.id] });
+    }
+  }
+
   const daysArray = Array.from({length: 14}, (_, i) => -13 + i).reverse(); // 0 to -13
   const isTodayActive = activeDateOffset === 0;
 
@@ -220,12 +241,12 @@ export default function Dashboard() {
       {/* History Feed */}
       <div style={{ width: '100%', marginBottom: '40px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
-          {combinedHistory.length === 0 ? (
+          {groupedHistory.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               No actions tracked on this day.
             </div>
           ) : (
-            combinedHistory.map(entry => {
+            groupedHistory.map(entry => {
               const rule = rules.find(r => r.id === entry.rule_id);
               let ruleName = rule ? rule.name : 'Unknown';
               if (entry.rule_id.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
@@ -236,6 +257,8 @@ export default function Dashboard() {
               if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
               if (entry.rule_id.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
               if (entry.rule_id === 'daily_debt_settlement') ruleName = 'Daily Debt Added';
+              
+              const displayName = entry.groupedCount > 1 ? `${entry.groupedCount}x ${ruleName}` : ruleName;
               
               const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
@@ -269,7 +292,7 @@ export default function Dashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                          {ruleName}
+                          {displayName}
                         </span>
                         <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)', opacity: 0.6 }}>
                           = {entry.runningPoints} pts
@@ -294,7 +317,7 @@ export default function Dashboard() {
                     </div>
                     {entry.isMe && !entry.is_cancelled && isTodayActive && (
                       <button 
-                        onClick={() => undoAction(entry.id)}
+                        onClick={() => undoAction(entry.groupedIds[0])}
                         style={{ background: 'transparent', border: 'none', color: 'var(--error-color)', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}
                       >
                         <Undo2 size={20} />
