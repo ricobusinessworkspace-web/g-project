@@ -293,36 +293,37 @@ export default function Dashboard() {
 
               return (
                 <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)', opacity: entry.is_cancelled ? 0.4 : 1, transition: 'opacity 0.2s ease' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: entry.isMe ? 'rgba(52,199,89,0.1)' : 'rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: entry.isMe ? 'var(--accent-color)' : 'var(--text-secondary)', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                      {entry.isMe ? 'YOU' : oppName.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                          {displayName}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)', opacity: 0.6 }}>
-                          = {entry.runningPoints} pts
-                        </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: entry.isMe ? 'rgba(52,199,89,0.1)' : 'rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: entry.isMe ? 'var(--accent-color)' : 'var(--text-secondary)', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                        {entry.isMe ? 'YOU' : oppName.substring(0, 2).toUpperCase()}
                       </div>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{timeStr}</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '700' }}>{timeStr}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '1.05rem', marginBottom: '4px' }}>
+                        {displayName}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {(entry.points_applied !== 0 || entry.rule_id.startsWith('gm_')) && (
+                          <span style={{ color: ptColor, fontWeight: '800', fontSize: '0.85rem' }}>
+                            {ptSign}{entry.points_applied} Points
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)', opacity: 0.6 }}>
+                          ({entry.runningPoints} total)
+                        </span>
+                        {(entry.debt_applied !== 0 || entry.rule_id === 'weekly_reset' || entry.rule_id === 'late_fee' || entry.rule_id === 'daily_debt_settlement') && (
+                          <span style={{ color: debtColor, fontWeight: '800', fontSize: '0.85rem', marginLeft: '4px' }}>
+                            {debtSign}{entry.debt_applied}€
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
-                      {(entry.points_applied !== 0 || entry.rule_id.startsWith('gm_')) && (
-                        <div style={{ background: ptBg, color: ptColor, padding: '4px 10px', borderRadius: '12px', fontWeight: '800', fontSize: '0.9rem' }}>
-                          {ptSign}{entry.points_applied} pts
-                        </div>
-                      )}
-                      {(entry.debt_applied !== 0 || entry.rule_id === 'weekly_reset' || entry.rule_id === 'late_fee' || entry.rule_id === 'daily_debt_settlement') && (
-                        <div style={{ color: debtColor, fontWeight: '800', fontSize: '0.85rem', marginTop: '4px' }}>
-                          {debtSign}{entry.debt_applied}€
-                        </div>
-                      )}
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
                     {entry.isMe && !entry.is_cancelled && (
                       <button 
                         onClick={() => undoAction(entry.groupedIds[0])}

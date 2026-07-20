@@ -5,7 +5,6 @@ export const CODE_OF_HONOR: Rule[] = [
   { id: 'gm_1', name: 'GM Breathing', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Sun' },
   { id: 'gm_2', name: 'Sleepy after 4:59', category: 'GM', impact_type: 'POINTS', base_value: 10, iconName: 'Moon' },
   { id: 'gm_3', name: 'Sleepy every hr', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Clock' },
-  { id: 'gm_4', name: 'Baby Nap', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Bed', free_uses_per_week: 1, daily_max: 1 },
 
   // GN
   { id: 'gn_1', name: 'Before 21:00', category: 'GN', impact_type: 'POINTS', base_value: -1, iconName: 'Moon' },
@@ -13,6 +12,7 @@ export const CODE_OF_HONOR: Rule[] = [
   { id: 'gn_3', name: 'Before 23:00', category: 'GN', impact_type: 'POINTS', base_value: -1, iconName: 'Moon' },
 
   // ONCE DAILY
+  { id: 'gm_4', name: 'Baby Nap', category: 'ONCE_DAILY', impact_type: 'POINTS', base_value: 5, iconName: 'Bed', free_uses_per_week: 1, daily_max: 1, description: 'After 12 PM, 1x 30 minutes free' },
   { id: 'od_1', name: 'Bussy', category: 'ONCE_DAILY', impact_type: 'POINTS', base_value: 1, iconName: 'Cat', daily_max: 1 },
   { id: 'od_2', name: 'Addy (30min GM)', category: 'ONCE_DAILY', impact_type: 'POINTS', base_value: 3, iconName: 'Phone', daily_max: 1 },
   { id: 'od_3', name: 'Drugs', category: 'ONCE_DAILY', impact_type: 'POINTS', base_value: 5, iconName: 'Pill', daily_max: 1 },

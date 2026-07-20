@@ -15,6 +15,7 @@ export interface Rule {
   iconName: string;
   requires_input?: boolean;
   input_step?: number;
+  description?: string;
   time_modifier?: TimeModifier;
   daily_max?: number;
   weekly_max?: number;

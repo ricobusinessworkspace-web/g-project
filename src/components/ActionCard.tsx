@@ -44,6 +44,7 @@ export default function ActionCard({ rule, onPress }: ActionCardProps) {
         <IconComponent color="#8E8E93" size={24} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span className="card-row-label">{rule.name}</span>
+          {rule.description && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{rule.description}</span>}
           {usageText && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{usageText} used</span>}
         </div>
       </div>

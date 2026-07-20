@@ -9,7 +9,14 @@ export default function RulesPage() {
   const [inputValue, setInputValue] = useState('');
 
   const displayRules = rules.filter(r => r.category !== 'GM' || r.id === 'gm_4');
-  const categories = [...new Set(displayRules.map(r => r.category))];
+  const orderedCategories = ['REOCCURING', 'ONCE_DAILY', 'EXERCISE', 'RECREATIONAL', 'BUSINESS', 'ABBAUEN', 'GN'];
+  const categories = [...new Set(displayRules.map(r => r.category))].sort((a, b) => {
+     let idxA = orderedCategories.indexOf(a);
+     let idxB = orderedCategories.indexOf(b);
+     if (idxA === -1) idxA = 99;
+     if (idxB === -1) idxB = 99;
+     return idxA - idxB;
+  });
 
   const triggerHaptic = () => {
     if (navigator.vibrate) {
@@ -55,7 +62,7 @@ export default function RulesPage() {
       
       {categories.map(category => (
         <div key={category} style={{ marginBottom: '32px' }}>
-          <div className="section-title">{category}</div>
+          <div className="section-title">{category.replace('_', ' ')}</div>
           <div className="card-list" style={{ marginBottom: 0 }}>
             {displayRules.filter(r => r.category === category).map(rule => (
               <ActionCard
