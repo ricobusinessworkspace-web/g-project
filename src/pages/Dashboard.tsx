@@ -121,7 +121,7 @@ export default function Dashboard() {
   const groupedHistory: any[] = [];
   for (const entry of combinedHistory) {
     const lastGroup = groupedHistory[groupedHistory.length - 1];
-    const isSpecial = entry.rule_id.startsWith('adj_') || entry.rule_id.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty' || entry.rule_id === 'late_fee' || entry.rule_id === 'weekly_reset' || entry.rule_id === 'daily_debt_settlement' || entry.rule_id.startsWith('gm_');
+    const isSpecial = entry.rule_id && (entry.rule_id.startsWith('adj_') || entry.rule_id.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty' || entry.rule_id === 'late_fee' || entry.rule_id === 'weekly_reset' || entry.rule_id === 'daily_debt_settlement' || entry.rule_id.startsWith('gm_'));
     
     if (
       lastGroup && 
@@ -295,13 +295,13 @@ export default function Dashboard() {
             groupedHistory.map(entry => {
               const rule = rules.find(r => r.id === entry.rule_id);
               let ruleName = rule ? rule.name : 'Unknown';
-              if (entry.rule_id.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
+              if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
               if (entry.rule_id === 'adj_weekly') ruleName = 'Weekly Debt Adjust';
               if (entry.rule_id === 'adj_total') ruleName = 'Total Debt Adjust';
               if (entry.rule_id === 'adj_points') ruleName = 'Points Adjust';
               if (entry.rule_id === 'late_fee') ruleName = 'Late Fee (Unpaid Debt)';
               if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
-              if (entry.rule_id.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
+              if (entry.rule_id?.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
               if (entry.rule_id === 'daily_debt_settlement') ruleName = 'Daily Debt Added';
               
               const displayName = entry.groupedCount > 1 ? `${entry.groupedCount}x ${ruleName}` : ruleName;
