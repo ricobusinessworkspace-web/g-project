@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import ActionCard from '../components/ActionCard';
 import { useTrackerStore } from '../store/trackerStore';
 
@@ -10,12 +11,22 @@ export default function RulesPage() {
   const displayRules = rules.filter(r => r.category !== 'GM' || r.id === 'gm_4');
   const categories = [...new Set(displayRules.map(r => r.category))];
 
+  const triggerHaptic = () => {
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+  };
+
   const handlePressAction = (rule: any) => {
     if (rule.requires_input) {
       setSelectedRule(rule);
       setInputValue('');
     } else {
+      triggerHaptic();
       logAction(rule);
+      toast.success(`Logged: ${rule.name}`, {
+        style: { borderRadius: '12px', background: '#333', color: '#fff' }
+      });
     }
   };
 
@@ -27,7 +38,11 @@ export default function RulesPage() {
         if (selectedRule.input_step) {
           multiplier = Math.ceil(val / selectedRule.input_step);
         }
+        triggerHaptic();
         logAction(selectedRule, multiplier);
+        toast.success(`Logged: ${selectedRule.name} (${val})`, {
+          style: { borderRadius: '12px', background: '#333', color: '#fff' }
+        });
       }
       setSelectedRule(null);
     }
@@ -35,6 +50,7 @@ export default function RulesPage() {
 
   return (
     <div className="container" style={{ paddingBottom: '120px' }}>
+      <Toaster position="bottom-center" />
       <h2 style={{ marginBottom: '24px', textAlign: 'center' }}>All Rules</h2>
       
       {categories.map(category => (
