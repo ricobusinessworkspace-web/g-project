@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../utils/supabase';
 import { CODE_OF_HONOR } from '../constants/rules';
+import { runCatchUpEngine } from '../utils/catchUpEngine';
 
 export type ImpactType = 'POINTS' | 'DEBT';
 export type TimeModifier = 'DOUBLE_BEFORE_6AM' | 'NONE';
@@ -103,6 +104,8 @@ interface TrackerState {
   opponentName: string | null;
   opponentIsOnline: boolean;
   opponentLastSettlementDate: string | null;
+  opponentLastWeeklyResetDate: string | null;
+  opponentLastLatePayDate: string | null;
   opponentLastGmDate: string | null;
   myTripAbroad: boolean;
   myFamilyTrip: boolean;
@@ -161,6 +164,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   opponentName: null,
   opponentIsOnline: false,
   opponentLastSettlementDate: null,
+  opponentLastWeeklyResetDate: null,
+  opponentLastLatePayDate: null,
   opponentLastGmDate: null,
   myTripAbroad: false,
   myFamilyTrip: false,
@@ -243,6 +248,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         opponentSicko: opponentData.sicko ?? false,
         opponentGoofFreeDayUsed: opponentData.goof_free_day_used ?? null,
         opponentLastSettlementDate: opponentData.last_settlement_date,
+        opponentLastWeeklyResetDate: opponentData.last_weekly_reset_date,
+        opponentLastLatePayDate: opponentData.last_late_pay_date,
         opponentLastGmDate: opponentData.last_gm_date,
       });
     }
@@ -361,195 +368,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   
   checkAndRunSettlement: async () => {
     const state = get();
-    if (!state.userId) return;
-
-    const now = new Date();
-    const todayStr = getLogicalDate(now);
-    const dayOfWeek = now.getDay();
-
-    let updates: any = {};
-    let localUpdates: any = {};
-
-    if (state.lastSettlementDate && state.lastSettlementDate !== todayStr) {
-      const isExempt = state.myTripAbroad || state.opponentTripAbroad || 
-                       state.mySicko || state.opponentSicko || 
-                       state.myGoofFreeDayUsed === state.lastSettlementDate || 
-                       state.opponentGoofFreeDayUsed === state.lastSettlementDate;
-                       
-      let penaltyPoints = 0;
-      
-      if (!isExempt) {
-        // Fetch actions for the lastSettlementDate
-        const [year, month, day] = state.lastSettlementDate.split('-').map(Number);
-        const targetDateStart = new Date(year, month - 1, day).getTime();
-        const targetDateEnd = targetDateStart + 24 * 60 * 60 * 1000;
-        
-        const { data: yesterdayActions } = await supabase.from('tracker_action_entries')
-          .select('*')
-          .eq('user_id', state.userId)
-          .gte('timestamp', targetDateStart)
-          .lt('timestamp', targetDateEnd);
-          
-        if (yesterdayActions) {
-          // Exercise check
-          let hasSufficientExercise = false;
-          const exerciseCounts: Record<string, number> = {};
-          for (const action of yesterdayActions) {
-            const rule = CODE_OF_HONOR.find(r => r.id === action.rule_id);
-            if (rule && rule.category === 'EXERCISE' && !action.is_cancelled) {
-              const actionDate = new Date(action.timestamp);
-              const isBefore6am = actionDate.getHours() < 6;
-              const factor = rule.time_modifier === 'DOUBLE_BEFORE_6AM' && isBefore6am ? 2 : 1;
-              let multiplier = 1;
-              if (rule.base_value !== 0) {
-                 multiplier = action.points_applied / (rule.base_value * factor);
-                 if (isNaN(multiplier) || multiplier <= 0) multiplier = 1;
-                 multiplier = Math.round(multiplier);
-              }
-
-              exerciseCounts[action.rule_id] = (exerciseCounts[action.rule_id] || 0) + multiplier;
-              if (exerciseCounts[action.rule_id] >= 3) {
-                hasSufficientExercise = true;
-              }
-            }
-          }
-          if (!hasSufficientExercise) penaltyPoints += 3;
-
-          // Chess check
-          const hasChess = yesterdayActions.some(a => a.rule_id === 'rec_5' && !a.is_cancelled);
-          if (!hasChess) penaltyPoints += 1;
-
-          // Social check
-          const hasSocial = yesterdayActions.some(a => a.rule_id === 'ma_2' && !a.is_cancelled);
-          if (!hasSocial) penaltyPoints += 2;
-        }
-      }
-
-      if (penaltyPoints > 0) {
-        const [year, month, day] = state.lastSettlementDate.split('-').map(Number);
-        const targetDateStart = new Date(year, month - 1, day).getTime();
-        await supabase.from('tracker_action_entries').insert({
-          id: Math.random().toString(),
-          user_id: state.userId,
-          rule_id: 'mandatory_penalty',
-          timestamp: targetDateStart + 24 * 60 * 60 * 1000 - 1000, // 23:59:59 local time
-          points_applied: penaltyPoints,
-          debt_applied: 0,
-        });
-      }
-
-      const finalYesterdayPoints = state.myPoints + penaltyPoints;
-                       
-      let newDebt = 0;
-      if (!isExempt) {
-        const diff = finalYesterdayPoints - state.opponentPoints;
-        if (diff > 0 && diff <= 9) newDebt = 5;
-        else if (diff >= 10 && diff <= 19) newDebt = 10;
-        else if (diff >= 20) newDebt = 15;
-      }
-
-      if (newDebt > 0) {
-        const [year, month, day] = state.lastSettlementDate.split('-').map(Number);
-        const targetDateStart = new Date(year, month - 1, day).getTime();
-        await supabase.from('tracker_action_entries').insert({
-          id: Math.random().toString(),
-          user_id: state.userId,
-          rule_id: 'daily_debt_settlement',
-          timestamp: targetDateStart + 24 * 60 * 60 * 1000 - 1000, // 23:59:59 local time
-          points_applied: 0,
-          debt_applied: newDebt,
-        });
-      }
-
-      const newWeeklyDebt = state.myWeeklyDebt + newDebt;
-
-      updates.last_settlement_date = todayStr;
-      updates.my_points = 5;
-      updates.my_debt = state.myDebt + newDebt;
-      updates.my_weekly_debt = newWeeklyDebt;
-
-      Object.assign(localUpdates, {
-        lastSettlementDate: todayStr,
-        myPoints: 5,
-        myDebt: state.myDebt + newDebt,
-        myWeeklyDebt: newWeeklyDebt
-      });
-    } else if (!state.lastSettlementDate) {
-      updates.last_settlement_date = todayStr;
-      localUpdates.lastSettlementDate = todayStr;
-    }
-
-    let currentWeeklyDebt = localUpdates.myWeeklyDebt ?? state.myWeeklyDebt;
-    let currentUnpaid = localUpdates.myUnpaidWeeklyDebt ?? state.myUnpaidWeeklyDebt;
-
-    const getMostRecentMonday = (d: Date) => {
-      const dCopy = new Date(d);
-      const day = dCopy.getDay();
-      const diff = dCopy.getDate() - day + (day === 0 ? -6 : 1);
-      return getISODate(new Date(dCopy.setDate(diff)));
-    };
-    
-    const recentMondayStr = getMostRecentMonday(now);
-
-    if (state.lastWeeklyResetDate !== recentMondayStr) {
-      currentUnpaid += currentWeeklyDebt;
-      currentWeeklyDebt = 0;
-
-      updates.last_weekly_reset_date = recentMondayStr;
-      updates.my_weekly_debt = 0;
-      updates.unpaid_weekly_debt = currentUnpaid;
-
-      await supabase.from('tracker_action_entries').insert({
-        id: Math.random().toString(),
-        user_id: state.userId,
-        rule_id: 'weekly_reset',
-        timestamp: Date.now(),
-        points_applied: 0,
-        debt_applied: -currentWeeklyDebt, // Weekly debt gets removed, pushed to Unpaid
-      });
-
-      Object.assign(localUpdates, {
-        lastWeeklyResetDate: recentMondayStr,
-        myWeeklyDebt: 0,
-        myUnpaidWeeklyDebt: currentUnpaid
-      });
-    }
-
-    if (currentUnpaid > 0) {
-       if (dayOfWeek !== 1) { // Apply stacking penalty every day except Monday
-          if (state.lastLatePayDate !== todayStr) {
-             currentUnpaid += 5; 
-             
-             updates.last_late_pay_date = todayStr;
-             updates.unpaid_weekly_debt = currentUnpaid;
-
-             await supabase.from('tracker_action_entries').insert({
-               id: Math.random().toString(),
-               user_id: state.userId,
-               rule_id: 'late_fee',
-               timestamp: Date.now(),
-               points_applied: 0,
-               debt_applied: 5,
-             });
-
-             Object.assign(localUpdates, {
-                lastLatePayDate: todayStr,
-                myUnpaidWeeklyDebt: currentUnpaid
-             });
-          }
-       }
-    } else {
-       if (state.lastLatePayDate !== null) {
-          updates.last_late_pay_date = null;
-          localUpdates.lastLatePayDate = null;
-       }
-    }
-
-    if (Object.keys(updates).length > 0) {
-      set({ ...localUpdates });
-      const { error } = await supabase.from('tracker_user_stats').update(updates).eq('user_id', state.userId);
-      if (error) alert('Settlement Update Error: ' + error.message);
-    }
+    await runCatchUpEngine(state, set);
   },
 
   logGm: async (wakeTime: Date) => {
