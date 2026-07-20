@@ -7,74 +7,11 @@ import RulesPage from './pages/Rules';
 import { supabase } from './utils/supabase';
 import { useTrackerStore } from './store/trackerStore';
 
-function WelcomeSplash({ userName }: { userName: string | null }) {
-  const [phase, setPhase] = useState<"text" | "logo" | "done">("text");
-
-  useEffect(() => {
-    const textTimer = setTimeout(() => setPhase("logo"), 1800);
-    const logoTimer = setTimeout(() => setPhase("done"), 3000);
-    return () => { clearTimeout(textTimer); clearTimeout(logoTimer); };
-  }, []);
-
-  if (phase === "done") return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "#000",
-        zIndex: 99999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: "opacity 0.6s ease-out",
-      }}
-    >
-      {phase === "text" && (
-        <div
-          style={{
-            position: "absolute",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#fff",
-            animation: "textFadeInOut 1.8s ease-in-out forwards",
-          }}
-        >
-          {userName ? `Welcome ${userName}` : "Welcome"}
-        </div>
-      )}
-
-      {phase === "logo" && (
-        <div
-          style={{
-            width: 100,
-            height: 100,
-            position: "relative",
-            animation: "logoFadeInPulse 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards, ecosystemPulse 2s cubic-bezier(0.4, 0, 0.6, 1) 0.6s infinite",
-            backgroundColor: "var(--brand-blue)",
-            borderRadius: 22,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 40,
-            fontWeight: 900,
-            color: "#fff"
-          }}
-        >
-          G
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function App() {
   const location = useLocation();
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const { fetchState, fetchRules, setupRealtimeSync } = useTrackerStore();
-  const [storedName] = useState(() => localStorage.getItem("gproject_user_name"));
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -104,46 +41,37 @@ export default function App() {
     }
   }, [session]);
 
-  const renderContent = () => {
-    if (authLoading) {
-      return <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}><div className="loader"></div></div>;
-    }
+  if (authLoading) {
+    return <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}><div className="global-spinner"></div></div>;
+  }
 
-    if (!session) {
-      return <LoginScreen />;
-    }
-
-    return (
-      <>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/rules" element={<RulesPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-
-        <nav className="bottom-nav">
-          <NavLink to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
-            <LayoutDashboard size={24} />
-            <span>Dashboard</span>
-          </NavLink>
-          <NavLink to="/rules" className={`nav-item ${location.pathname === '/rules' ? 'active' : ''}`}>
-            <BookOpen size={24} />
-            <span>Rules</span>
-          </NavLink>
-          <NavLink to="/settings" className={`nav-item ${location.pathname === '/settings' ? 'active' : ''}`}>
-            <Settings size={24} />
-            <span>Settings</span>
-          </NavLink>
-        </nav>
-      </>
-    );
-  };
+  if (!session) {
+    return <LoginScreen />;
+  }
 
   return (
     <>
-      <WelcomeSplash userName={storedName} />
-      {renderContent()}
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/rules" element={<RulesPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+
+      <nav className="bottom-nav">
+        <NavLink to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
+          <LayoutDashboard size={24} />
+          <span>Dashboard</span>
+        </NavLink>
+        <NavLink to="/rules" className={`nav-item ${location.pathname === '/rules' ? 'active' : ''}`}>
+          <BookOpen size={24} />
+          <span>Rules</span>
+        </NavLink>
+        <NavLink to="/settings" className={`nav-item ${location.pathname === '/settings' ? 'active' : ''}`}>
+          <Settings size={24} />
+          <span>Settings</span>
+        </NavLink>
+      </nav>
     </>
   );
 }

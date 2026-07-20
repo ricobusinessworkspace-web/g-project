@@ -291,21 +291,15 @@ input:checked + .slider:before {
   transform: translateX(20px);
 }
 
-/* Splash Screen Animations */
-@keyframes textFadeInOut {
-  0% { opacity: 0; transform: scale(0.95); }
-  20% { opacity: 1; transform: scale(1); }
-  80% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.05); }
+/* Global Spinner */
+.global-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: global-spin 1s ease-in-out infinite;
 }
-
-@keyframes logoFadeInPulse {
-  0% { opacity: 0; transform: scale(0.8); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes ecosystemPulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+@keyframes global-spin {
+  to { transform: rotate(360deg); }
 }
