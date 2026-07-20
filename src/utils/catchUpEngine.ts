@@ -113,8 +113,17 @@ export const runCatchUpEngine = async (state: any, set: any) => {
       }
     }
     if (!hasSufficientExercise) pen += 3;
-    if (!actions.some(a => a.rule_id === 'rec_5' && !a.is_cancelled)) pen += 1;
-    if (!actions.some(a => a.rule_id === 'ma_2' && !a.is_cancelled)) pen += 2;
+    
+    // Dynamically apply miss_penalty for any rule that has it set
+    for (const rule of rules) {
+      if (rule.miss_penalty && rule.miss_penalty > 0) {
+        // If they didn't log this rule today, add the penalty
+        if (!actions.some(a => a.rule_id === rule.id && !a.is_cancelled)) {
+          pen += rule.miss_penalty;
+        }
+      }
+    }
+
     return pen;
   };
 

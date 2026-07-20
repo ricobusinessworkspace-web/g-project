@@ -403,6 +403,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         daily_max: r.daily_max || undefined,
         weekly_max: r.weekly_max || undefined,
         free_uses_per_week: r.free_uses_per_week || undefined,
+        miss_penalty: r.miss_penalty || undefined,
         sort_order: r.sort_order || 0,
       }));
       // Explicitly sort by sort_order, then by id as fallback
@@ -428,6 +429,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         daily_max: r.daily_max || null,
         weekly_max: r.weekly_max || null,
         free_uses_per_week: r.free_uses_per_week || null,
+        miss_penalty: r.miss_penalty || null,
         sort_order: index,
       }));
       const { error: seedErr } = await supabase.from('tracker_rules').insert(dbRows);
@@ -462,6 +464,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       daily_max: newRule.daily_max || null,
       weekly_max: newRule.weekly_max || null,
       free_uses_per_week: newRule.free_uses_per_week || null,
+      miss_penalty: newRule.miss_penalty || null,
       sort_order: sort_order,
     });
     
@@ -488,6 +491,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       daily_max: rule.daily_max || null,
       weekly_max: rule.weekly_max || null,
       free_uses_per_week: rule.free_uses_per_week || null,
+      miss_penalty: rule.miss_penalty || null,
       updated_at: new Date().toISOString(),
     }).eq('id', rule.id);
     

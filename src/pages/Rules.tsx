@@ -50,6 +50,7 @@ const emptyForm: RuleFormState = {
   requires_input: false,
   input_step: '',
   time_modifier: '',
+  miss_penalty: '',
 };
 
 export default function RulesPage() {
@@ -159,6 +160,7 @@ export default function RulesPage() {
       requires_input: rule.requires_input || false,
       input_step: rule.input_step?.toString() || '',
       time_modifier: rule.time_modifier || '',
+      miss_penalty: rule.miss_penalty?.toString() || '',
     });
     setEditingRule(rule);
     setSelectedRule('editor');
@@ -183,6 +185,7 @@ export default function RulesPage() {
       requires_input: form.requires_input,
       input_step: form.input_step ? parseInt(form.input_step) : undefined,
       time_modifier: form.time_modifier || undefined,
+      miss_penalty: form.miss_penalty ? parseInt(form.miss_penalty) : undefined,
     };
 
     if (editingRule) {
@@ -480,16 +483,29 @@ export default function RulesPage() {
                 </div>
               )}
 
-              <div>
-                <label style={labelStyle}>Time Modifier</label>
-                <select 
-                  style={{...inputStyle, appearance: 'none'}} 
-                  value={form.time_modifier} 
-                  onChange={e => setForm({...form, time_modifier: e.target.value})}
-                >
-                  <option value="">None</option>
-                  <option value="DOUBLE_BEFORE_6AM">Double Before 6 AM</option>
-                </select>
+              {/* Advanced Settings */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={labelStyle}>Miss Penalty</label>
+                  <input 
+                    style={inputStyle} 
+                    type="number" 
+                    value={form.miss_penalty} 
+                    onChange={e => setForm({...form, miss_penalty: e.target.value})} 
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Time Modifier</label>
+                  <select 
+                    style={{...inputStyle, appearance: 'none'}} 
+                    value={form.time_modifier} 
+                    onChange={e => setForm({...form, time_modifier: e.target.value})}
+                  >
+                    <option value="">None</option>
+                    <option value="DOUBLE_BEFORE_6AM">Double before 6AM</option>
+                  </select>
+                </div>
               </div>
             </div>
 
