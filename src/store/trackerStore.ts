@@ -21,7 +21,7 @@ export interface Rule {
   weekly_max?: number;
   free_uses_per_week?: number;
   miss_penalty?: number;
-  created_at?: string;
+  sort_order?: number;
 }
 
 export interface ActionEntry {
@@ -403,13 +403,18 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         daily_max: r.daily_max || undefined,
         weekly_max: r.weekly_max || undefined,
         free_uses_per_week: r.free_uses_per_week || undefined,
-        created_at: r.created_at,
+        sort_order: r.sort_order || 0,
       }));
+      // Explicitly sort by sort_order, then by id as fallback
+      mapped.sort((a, b) => {
+        if (a.sort_order !== b.sort_order) return (a.sort_order || 0) - (b.sort_order || 0);
+        return a.id.localeCompare(b.id);
+      });
       set({ rules: mapped });
     } else {
       // DB table is empty — auto-seed from static CODE_OF_HONOR
       console.log('tracker_rules table is empty, seeding with CODE_OF_HONOR...');
-      const dbRows = CODE_OF_HONOR.map(r => ({
+      const dbRows = CODE_OF_HONOR.map((r, index) => ({
         id: r.id,
         name: r.name,
         category: r.category,
@@ -423,18 +428,25 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         daily_max: r.daily_max || null,
         weekly_max: r.weekly_max || null,
         free_uses_per_week: r.free_uses_per_week || null,
+        sort_order: index,
       }));
       const { error: seedErr } = await supabase.from('tracker_rules').insert(dbRows);
       if (seedErr) {
         console.error('Failed to seed rules:', seedErr.message);
       }
-      set({ rules: CODE_OF_HONOR });
+      set({ rules: CODE_OF_HONOR.map((r, index) => ({ ...r, sort_order: index })) });
     }
   },
 
   addRule: async (ruleData: Omit<Rule, 'id'>) => {
     const id = `custom_${Date.now()}`;
-    const newRule: Rule = { ...ruleData, id };
+    // Put new rule at the bottom of its category
+    const state = get();
+    const categoryRules = state.rules.filter(r => r.category === ruleData.category);
+    const maxSort = categoryRules.length > 0 ? Math.max(...categoryRules.map(r => r.sort_order || 0)) : 0;
+    const sort_order = maxSort + 1;
+    
+    const newRule: Rule = { ...ruleData, id, sort_order };
     
     const { error } = await supabase.from('tracker_rules').insert({
       id,
@@ -450,6 +462,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       daily_max: newRule.daily_max || null,
       weekly_max: newRule.weekly_max || null,
       free_uses_per_week: newRule.free_uses_per_week || null,
+      sort_order: sort_order,
     });
     
     if (error) {
@@ -457,7 +470,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       return;
     }
     
-    // Refresh to get the actual created_at from DB
+    // Refresh to get actual order
     await get().fetchRules();
   },
 
@@ -508,29 +521,40 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const rule = rules[ruleIndex];
     // Find all rules in the same category
     const categoryRules = rules.filter(r => r.category === rule.category);
-    // They are already sorted by created_at because fetchRules orders them
+    // They are already sorted because fetchRules sorted them
     const catIndex = categoryRules.findIndex(r => r.id === ruleId);
     
-    if (direction === 'UP' && catIndex > 0) {
-      const swapRule = categoryRules[catIndex - 1];
-      const tempDate = rule.created_at;
-      rule.created_at = swapRule.created_at;
-      swapRule.created_at = tempDate;
+    if ((direction === 'UP' && catIndex > 0) || (direction === 'DOWN' && catIndex < categoryRules.length - 1)) {
+      // Swap in the local array
+      const swapIndex = direction === 'UP' ? catIndex - 1 : catIndex + 1;
+      const temp = categoryRules[catIndex];
+      categoryRules[catIndex] = categoryRules[swapIndex];
+      categoryRules[swapIndex] = temp;
       
-      set({ rules: [...rules] }); // Optimistic UI update
+      // Now assign clean sort_order values 0, 1, 2...
+      categoryRules.forEach((r, idx) => {
+        r.sort_order = idx;
+      });
       
-      await supabase.from('tracker_rules').update({ created_at: rule.created_at }).eq('id', rule.id);
-      await supabase.from('tracker_rules').update({ created_at: swapRule.created_at }).eq('id', swapRule.id);
-    } else if (direction === 'DOWN' && catIndex < categoryRules.length - 1) {
-      const swapRule = categoryRules[catIndex + 1];
-      const tempDate = rule.created_at;
-      rule.created_at = swapRule.created_at;
-      swapRule.created_at = tempDate;
+      // Update state optimistically (need to update the main rules array)
+      const newRules = rules.map(r => {
+        const catR = categoryRules.find(cr => cr.id === r.id);
+        return catR ? catR : r;
+      });
+      // Re-sort the main array
+      newRules.sort((a, b) => {
+        if (a.category === b.category) {
+          return (a.sort_order || 0) - (b.sort_order || 0);
+        }
+        return 0; // category sorting is handled by UI
+      });
+      set({ rules: newRules });
       
-      set({ rules: [...rules] }); // Optimistic UI update
-      
-      await supabase.from('tracker_rules').update({ created_at: rule.created_at }).eq('id', rule.id);
-      await supabase.from('tracker_rules').update({ created_at: swapRule.created_at }).eq('id', swapRule.id);
+      // Push all updates to Supabase (only for this category)
+      const updates = categoryRules.map(r => 
+        supabase.from('tracker_rules').update({ sort_order: r.sort_order }).eq('id', r.id)
+      );
+      await Promise.all(updates);
     }
   },
   
