@@ -380,7 +380,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       
       if (!isExempt) {
         // Fetch actions for the lastSettlementDate
-        const targetDateStart = new Date(state.lastSettlementDate).getTime();
+        const [year, month, day] = state.lastSettlementDate.split('-').map(Number);
+        const targetDateStart = new Date(year, month - 1, day).getTime();
         const targetDateEnd = targetDateStart + 24 * 60 * 60 * 1000;
         
         const { data: yesterdayActions } = await supabase.from('tracker_action_entries')
@@ -445,6 +446,19 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         if (diff > 0 && diff <= 9) newDebt = 5;
         else if (diff >= 10 && diff <= 19) newDebt = 10;
         else if (diff >= 20) newDebt = 15;
+      }
+
+      if (newDebt > 0) {
+        const [year, month, day] = state.lastSettlementDate.split('-').map(Number);
+        const targetDateStart = new Date(year, month - 1, day).getTime();
+        await supabase.from('tracker_action_entries').insert({
+          id: Math.random().toString(),
+          user_id: state.userId,
+          rule_id: 'daily_debt_settlement',
+          timestamp: targetDateStart + 24 * 60 * 60 * 1000 - 1000, // 23:59:59 local time
+          points_applied: 0,
+          debt_applied: newDebt,
+        });
       }
 
       const newWeeklyDebt = state.myWeeklyDebt + newDebt;

@@ -224,6 +224,7 @@ export default function Dashboard() {
               if (entry.rule_id === 'late_fee') ruleName = 'Late Fee (Unpaid Debt)';
               if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
               if (entry.rule_id.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
+              if (entry.rule_id === 'daily_debt_settlement') ruleName = 'Daily Debt Added';
               
               const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
@@ -248,7 +249,7 @@ export default function Dashboard() {
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
-                      {entry.points_applied !== 0 && (
+                      {(entry.points_applied !== 0 || entry.rule_id.startsWith('gm_')) && (
                         <div style={{ background: entry.points_applied > 0 ? 'rgba(255,69,58,0.15)' : 'rgba(52,199,89,0.15)', color: entry.points_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', padding: '4px 10px', borderRadius: '12px', fontWeight: '800', fontSize: '0.9rem' }}>
                           {entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts
                         </div>
