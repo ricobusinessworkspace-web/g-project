@@ -1,8 +1,22 @@
 import React, { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import ActionCard from '../components/ActionCard';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { SortableRuleItem } from '../components/SortableRuleItem';
 import { Rule, useTrackerStore } from '../store/trackerStore';
-import { Plus, Pencil, Trash2, X, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, X, ChevronDown } from 'lucide-react';
 
 const CATEGORY_ORDER = ['REOCCURING', 'ONCE_DAILY', 'EXERCISE', 'RECREATIONAL', 'BUSINESS', 'ABBAUEN', 'GN'];
 const ALL_CATEGORIES = ['REOCCURING', 'ONCE_DAILY', 'EXERCISE', 'RECREATIONAL', 'BUSINESS', 'ABBAUEN', 'GN', 'GM'];
@@ -39,7 +53,7 @@ const emptyForm: RuleFormState = {
 };
 
 export default function RulesPage() {
-  const { rules, logAction, addRule, updateRule, deleteRule, reorderRule } = useTrackerStore();
+  const { rules, logAction, addRule, updateRule, deleteRule, reorderCategoryRules } = useTrackerStore();
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -55,6 +69,37 @@ export default function RulesPage() {
      if (idxB === -1) idxB = 99;
      return idxA - idxB;
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // minimum distance before drag starts to not interfere with taps
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent, category: string) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const categoryRules = displayRules.filter(r => r.category === category);
+      const oldIndex = categoryRules.findIndex(r => r.id === active.id);
+      const newIndex = categoryRules.findIndex(r => r.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // Move item in array locally
+        const newArr = [...categoryRules];
+        const [movedItem] = newArr.splice(oldIndex, 1);
+        newArr.splice(newIndex, 0, movedItem);
+        
+        // Pass the new ordered IDs to the store
+        reorderCategoryRules(newArr.map(r => r.id));
+      }
+    }
+  };
 
   const triggerHaptic = () => {
     if (navigator.vibrate) {
@@ -209,65 +254,29 @@ export default function RulesPage() {
         <div key={category} style={{ marginBottom: '32px' }}>
           <div className="section-title">{category.replace('_', ' ')}</div>
           <div className="card-list" style={{ marginBottom: 0 }}>
-            {displayRules.filter(r => r.category === category).map((rule, idx, arr) => (
-              <div key={rule.id} style={{ position: 'relative' }}>
-                {isEditing && (
-                  <div style={{ 
-                    position: 'absolute', 
-                    right: '0', 
-                    top: '50%', 
-                    transform: 'translateY(-50%)', 
-                    display: 'flex', 
-                    gap: '4px', 
-                    zIndex: 10,
-                    paddingRight: '8px'
-                  }}>
-                    {idx > 0 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); reorderRule(rule.id, 'UP'); }}
-                        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                      >
-                        <ArrowUp size={16} color="var(--text-secondary)" />
-                      </button>
-                    )}
-                    {idx < arr.length - 1 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); reorderRule(rule.id, 'DOWN'); }}
-                        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                      >
-                        <ArrowDown size={16} color="var(--text-secondary)" />
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openEditModal(rule); }}
-                      style={{ background: 'rgba(10,132,255,0.15)', border: 'none', borderRadius: '10px', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px' }}
-                    >
-                      <Pencil size={16} color="#0A84FF" />
-                    </button>
-                    {deleteConfirm === rule.id ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(rule.id); }}
-                        style={{ background: 'var(--error-color)', border: 'none', borderRadius: '10px', padding: '6px 10px', cursor: 'pointer', color: 'white', fontSize: '0.75rem', fontWeight: 'bold' }}
-                      >
-                        Confirm
-                      </button>
-                    ) : (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm(rule.id); }}
-                        style={{ background: 'rgba(255,59,48,0.15)', border: 'none', borderRadius: '10px', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                      >
-                        <Trash2 size={16} color="#FF3B30" />
-                      </button>
-                    )}
-                  </div>
-                )}
-                <ActionCard
-                  rule={rule}
-                  onPress={() => handlePressAction(rule)}
-                  hideValue={isEditing}
-                />
-              </div>
-            ))}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(e) => handleDragEnd(e, category)}
+            >
+              <SortableContext
+                items={displayRules.filter(r => r.category === category).map(r => r.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {displayRules.filter(r => r.category === category).map(rule => (
+                  <SortableRuleItem
+                    key={rule.id}
+                    rule={rule}
+                    isEditing={isEditing}
+                    onPress={() => handlePressAction(rule)}
+                    onEdit={() => openEditModal(rule)}
+                    onDeleteRequest={() => setDeleteConfirm(rule.id)}
+                    onDeleteConfirm={() => handleDelete(rule.id)}
+                    deleteConfirmId={deleteConfirm}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
       ))}

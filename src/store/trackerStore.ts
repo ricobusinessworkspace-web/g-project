@@ -134,7 +134,7 @@ interface TrackerState {
   addRule: (rule: Omit<Rule, 'id'>) => Promise<void>;
   updateRule: (rule: Rule) => Promise<void>;
   deleteRule: (ruleId: string) => Promise<void>;
-  reorderRule: (ruleId: string, direction: 'UP' | 'DOWN') => Promise<void>;
+  reorderCategoryRules: (orderedIds: string[]) => Promise<void>;
   logAction: (rule: Rule, multiplier?: number) => void;
   undoAction: (actionId: string) => void;
   adjustDebt: (type: 'WEEKLY' | 'TOTAL', newAmount: number) => Promise<void>;
@@ -512,50 +512,33 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     set({ rules: get().rules.filter(r => r.id !== ruleId) });
   },
 
-  reorderRule: async (ruleId: string, direction: 'UP' | 'DOWN') => {
+  reorderCategoryRules: async (orderedIds: string[]) => {
     const state = get();
     const rules = [...state.rules];
-    const ruleIndex = rules.findIndex(r => r.id === ruleId);
-    if (ruleIndex === -1) return;
-
-    const rule = rules[ruleIndex];
-    // Find all rules in the same category
-    const categoryRules = rules.filter(r => r.category === rule.category);
-    // They are already sorted because fetchRules sorted them
-    const catIndex = categoryRules.findIndex(r => r.id === ruleId);
     
-    if ((direction === 'UP' && catIndex > 0) || (direction === 'DOWN' && catIndex < categoryRules.length - 1)) {
-      // Swap in the local array
-      const swapIndex = direction === 'UP' ? catIndex - 1 : catIndex + 1;
-      const temp = categoryRules[catIndex];
-      categoryRules[catIndex] = categoryRules[swapIndex];
-      categoryRules[swapIndex] = temp;
-      
-      // Now assign clean sort_order values 0, 1, 2...
-      categoryRules.forEach((r, idx) => {
-        r.sort_order = idx;
-      });
-      
-      // Update state optimistically (need to update the main rules array)
-      const newRules = rules.map(r => {
-        const catR = categoryRules.find(cr => cr.id === r.id);
-        return catR ? catR : r;
-      });
-      // Re-sort the main array
-      newRules.sort((a, b) => {
-        if (a.category === b.category) {
-          return (a.sort_order || 0) - (b.sort_order || 0);
-        }
-        return 0; // category sorting is handled by UI
-      });
-      set({ rules: newRules });
-      
-      // Push all updates to Supabase (only for this category)
-      const updates = categoryRules.map(r => 
-        supabase.from('tracker_rules').update({ sort_order: r.sort_order }).eq('id', r.id)
-      );
-      await Promise.all(updates);
-    }
+    // Find all affected rules and update their sort_order locally
+    orderedIds.forEach((id, index) => {
+      const rule = rules.find(r => r.id === id);
+      if (rule) {
+        rule.sort_order = index;
+      }
+    });
+    
+    // Re-sort the main array
+    rules.sort((a, b) => {
+      if (a.category === b.category) {
+        return (a.sort_order || 0) - (b.sort_order || 0);
+      }
+      return 0;
+    });
+    
+    set({ rules }); // Optimistic update
+    
+    // Push updates to Supabase
+    const updates = orderedIds.map((id, index) => 
+      supabase.from('tracker_rules').update({ sort_order: index }).eq('id', id)
+    );
+    await Promise.all(updates);
   },
   
   checkAndRunSettlement: async () => {
