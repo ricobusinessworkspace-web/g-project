@@ -425,12 +425,13 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       }
 
       if (penaltyPoints > 0) {
-        const targetDateStart = new Date(state.lastSettlementDate).getTime();
+        const [year, month, day] = state.lastSettlementDate.split('-').map(Number);
+        const targetDateStart = new Date(year, month - 1, day).getTime();
         await supabase.from('tracker_action_entries').insert({
           id: Math.random().toString(),
           user_id: state.userId,
           rule_id: 'mandatory_penalty',
-          timestamp: targetDateStart + 24 * 60 * 60 * 1000 - 1000, // 23:59:59
+          timestamp: targetDateStart + 24 * 60 * 60 * 1000 - 1000, // 23:59:59 local time
           points_applied: penaltyPoints,
           debt_applied: 0,
         });
