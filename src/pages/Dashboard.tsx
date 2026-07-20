@@ -165,11 +165,11 @@ export default function Dashboard() {
       {/* Header / Main Score */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', marginBottom: '60px' }}>
         <div className="section-title">Account</div>
-        <div style={{ fontSize: '120px', fontWeight: '800', letterSpacing: '-4px', margin: '20px 0' }}>
+        <div style={{ fontSize: '130px', fontWeight: '700', letterSpacing: '-6px', margin: '10px 0', lineHeight: '1' }}>
           {myPoints}
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--card-bg)', padding: '8px 16px', borderRadius: '20px', border: '1px solid var(--card-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px 16px', borderRadius: '20px' }}>
           <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{diffText}</span>
         </div>
         
@@ -203,8 +203,8 @@ export default function Dashboard() {
                   flexShrink: 0,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   padding: '10px 16px', borderRadius: '20px', cursor: 'pointer',
-                  background: isActive ? 'var(--accent-color)' : 'var(--card-bg)',
-                  border: isActive ? 'none' : '1px solid var(--card-border)',
+                  background: isActive ? 'var(--accent-color)' : 'transparent',
+                  border: 'none',
                   color: isActive ? 'white' : 'var(--text-secondary)',
                   transition: 'all 0.2s ease'
                 }}
@@ -219,9 +219,9 @@ export default function Dashboard() {
 
       {/* History Feed */}
       <div style={{ width: '100%', marginBottom: '40px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
           {combinedHistory.length === 0 ? (
-            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', background: 'var(--card-bg)', borderRadius: '20px', border: '1px solid var(--card-border)' }}>
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               No actions tracked on this day.
             </div>
           ) : (
@@ -240,15 +240,13 @@ export default function Dashboard() {
               const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
               let ptColor = 'var(--text-secondary)';
-              let ptBg = 'rgba(255,255,255,0.05)';
+              let ptBg = 'transparent';
               let ptSign = '';
               if (entry.points_applied > 0) {
                 ptColor = 'var(--error-color)';
-                ptBg = 'rgba(255,69,58,0.15)';
                 ptSign = '+';
               } else if (entry.points_applied < 0) {
                 ptColor = 'var(--accent-color)';
-                ptBg = 'rgba(52,199,89,0.15)';
               }
 
               let debtColor = 'var(--text-secondary)';
@@ -263,7 +261,7 @@ export default function Dashboard() {
               }
 
               return (
-                <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--card-bg)', borderRadius: '20px', border: '1px solid var(--card-border)', opacity: entry.is_cancelled ? 0.4 : 1, transition: 'opacity 0.2s ease' }}>
+                <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)', opacity: entry.is_cancelled ? 0.4 : 1, transition: 'opacity 0.2s ease' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: entry.isMe ? 'rgba(52,199,89,0.1)' : 'rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: entry.isMe ? 'var(--accent-color)' : 'var(--text-secondary)', fontWeight: 'bold', fontSize: '0.8rem' }}>
                       {entry.isMe ? 'YOU' : oppName.substring(0, 2).toUpperCase()}

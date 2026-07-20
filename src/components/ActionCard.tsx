@@ -53,10 +53,9 @@ export default function ActionCard({ rule, onPress }: ActionCardProps) {
         </div>
       </div>
       <div style={{ 
-        backgroundColor: 'var(--card-border)', 
-        padding: '6px 12px', 
-        borderRadius: '8px',
-        fontWeight: 'bold',
+        padding: '4px 8px', 
+        fontWeight: '800',
+        fontSize: '1.1rem',
         color: isPositiveForOpponent ? 'var(--error-color)' : 'var(--accent-color)'
       }}>
         {displayValue}
