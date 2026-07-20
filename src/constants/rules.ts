@@ -1,5 +1,7 @@
 import { Rule } from '../store/trackerStore';
 
+// These are used ONLY as a seed if the database tracker_rules table is empty.
+// Once seeded, all rule management happens through the database.
 export const CODE_OF_HONOR: Rule[] = [
   // GM (These will likely be handled mostly via custom buttons, but listed here for manual fallback)
   { id: 'gm_1', name: 'GM Breathing', category: 'GM', impact_type: 'POINTS', base_value: 5, iconName: 'Sun' },

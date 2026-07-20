@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
-import { CODE_OF_HONOR } from '../constants/rules';
-import { getISODate, getLogicalDate } from '../store/trackerStore';
+import { getISODate, getLogicalDate, useTrackerStore } from '../store/trackerStore';
 
 export const runCatchUpEngine = async (state: any, set: any) => {
   if (!state.userId) return;
@@ -89,8 +88,9 @@ export const runCatchUpEngine = async (state: any, set: any) => {
     let pen = 0;
     let hasSufficientExercise = false;
     const exerciseCounts: Record<string, number> = {};
+    const rules = useTrackerStore.getState().rules;
     for (const action of actions) {
-      const rule = CODE_OF_HONOR.find(r => r.id === action.rule_id);
+      const rule = rules.find(r => r.id === action.rule_id);
       if (rule && rule.category === 'EXERCISE' && !action.is_cancelled) {
         const actionDate = new Date(action.timestamp);
         const isBefore6am = actionDate.getHours() < 6;

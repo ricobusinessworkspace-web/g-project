@@ -130,6 +130,9 @@ interface TrackerState {
   fetchState: (userId: string) => Promise<void>;
   setupRealtimeSync: (userId: string) => void;
   fetchRules: () => Promise<void>;
+  addRule: (rule: Omit<Rule, 'id'>) => Promise<void>;
+  updateRule: (rule: Rule) => Promise<void>;
+  deleteRule: (ruleId: string) => Promise<void>;
   logAction: (rule: Rule, multiplier?: number) => void;
   undoAction: (actionId: string) => void;
   adjustDebt: (type: 'WEEKLY' | 'TOTAL', newAmount: number) => Promise<void>;
@@ -337,6 +340,14 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       })
       .subscribe();
 
+    // Realtime sync for rules changes (so both players see edits immediately)
+    supabase.channel('public:tracker_rules')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tracker_rules' }, () => {
+        // On any change to rules, re-fetch the full list to keep it clean
+        get().fetchRules();
+      })
+      .subscribe();
+
     const roomOne = supabase.channel('online-users');
     roomOne.on('presence', { event: 'sync' }, () => {
       const state = get();
@@ -364,7 +375,125 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   setOpponentPoints: (points: number) => set({ opponentPoints: points }),
   
   fetchRules: async () => {
-    set({ rules: CODE_OF_HONOR });
+    // Try to load rules from the database
+    const { data, error } = await supabase.from('tracker_rules').select('*').order('created_at');
+    
+    if (error) {
+      // Table doesn't exist or other error - fall back to static rules
+      console.warn('Could not load rules from DB, using static fallback:', error.message);
+      set({ rules: CODE_OF_HONOR });
+      return;
+    }
+
+    if (data && data.length > 0) {
+      // Map DB columns (snake_case) to app format (camelCase)
+      const mapped: Rule[] = data.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        impact_type: r.impact_type,
+        base_value: r.base_value,
+        iconName: r.icon_name || 'Circle',
+        requires_input: r.requires_input || false,
+        input_step: r.input_step || undefined,
+        description: r.description || undefined,
+        time_modifier: r.time_modifier || undefined,
+        daily_max: r.daily_max || undefined,
+        weekly_max: r.weekly_max || undefined,
+        free_uses_per_week: r.free_uses_per_week || undefined,
+      }));
+      set({ rules: mapped });
+    } else {
+      // DB table is empty — auto-seed from static CODE_OF_HONOR
+      console.log('tracker_rules table is empty, seeding with CODE_OF_HONOR...');
+      const dbRows = CODE_OF_HONOR.map(r => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        impact_type: r.impact_type,
+        base_value: r.base_value,
+        icon_name: r.iconName,
+        requires_input: r.requires_input || false,
+        input_step: r.input_step || null,
+        description: r.description || null,
+        time_modifier: r.time_modifier || null,
+        daily_max: r.daily_max || null,
+        weekly_max: r.weekly_max || null,
+        free_uses_per_week: r.free_uses_per_week || null,
+      }));
+      const { error: seedErr } = await supabase.from('tracker_rules').insert(dbRows);
+      if (seedErr) {
+        console.error('Failed to seed rules:', seedErr.message);
+      }
+      set({ rules: CODE_OF_HONOR });
+    }
+  },
+
+  addRule: async (ruleData: Omit<Rule, 'id'>) => {
+    const id = `custom_${Date.now()}`;
+    const newRule: Rule = { ...ruleData, id };
+    
+    const { error } = await supabase.from('tracker_rules').insert({
+      id,
+      name: newRule.name,
+      category: newRule.category,
+      impact_type: newRule.impact_type,
+      base_value: newRule.base_value,
+      icon_name: newRule.iconName,
+      requires_input: newRule.requires_input || false,
+      input_step: newRule.input_step || null,
+      description: newRule.description || null,
+      time_modifier: newRule.time_modifier || null,
+      daily_max: newRule.daily_max || null,
+      weekly_max: newRule.weekly_max || null,
+      free_uses_per_week: newRule.free_uses_per_week || null,
+    });
+    
+    if (error) {
+      alert('Failed to add rule: ' + error.message);
+      return;
+    }
+    
+    // Optimistic update - realtime will also fire
+    set({ rules: [...get().rules, newRule] });
+  },
+
+  updateRule: async (rule: Rule) => {
+    const { error } = await supabase.from('tracker_rules').update({
+      name: rule.name,
+      category: rule.category,
+      impact_type: rule.impact_type,
+      base_value: rule.base_value,
+      icon_name: rule.iconName,
+      requires_input: rule.requires_input || false,
+      input_step: rule.input_step || null,
+      description: rule.description || null,
+      time_modifier: rule.time_modifier || null,
+      daily_max: rule.daily_max || null,
+      weekly_max: rule.weekly_max || null,
+      free_uses_per_week: rule.free_uses_per_week || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', rule.id);
+    
+    if (error) {
+      alert('Failed to update rule: ' + error.message);
+      return;
+    }
+    
+    // Optimistic update
+    set({ rules: get().rules.map(r => r.id === rule.id ? rule : r) });
+  },
+
+  deleteRule: async (ruleId: string) => {
+    const { error } = await supabase.from('tracker_rules').delete().eq('id', ruleId);
+    
+    if (error) {
+      alert('Failed to delete rule: ' + error.message);
+      return;
+    }
+    
+    // Optimistic update
+    set({ rules: get().rules.filter(r => r.id !== ruleId) });
   },
   
   checkAndRunSettlement: async () => {
