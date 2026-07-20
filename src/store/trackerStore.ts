@@ -9,7 +9,7 @@ export type TimeModifier = 'DOUBLE_BEFORE_6AM' | 'NONE';
 export interface Rule {
   id: string;
   name: string;
-  category: 'REOCCURING' | 'ONCE_DAILY' | 'SLEEP_TAXES' | 'EXERCISE' | 'RECREATIONAL' | 'SALES' | 'PERSONAL' | 'MANDATORY' | 'ABBAUEN' | 'GN' | 'GM';
+  category: 'REOCCURING' | 'ONCE_DAILY' | 'SLEEP_TAXES' | 'EXERCISE' | 'RECREATIONAL' | 'BUSINESS' | 'PERSONAL' | 'MANDATORY' | 'ABBAUEN' | 'GN' | 'GM';
   impact_type: ImpactType;
   base_value: number;
   iconName: string;
