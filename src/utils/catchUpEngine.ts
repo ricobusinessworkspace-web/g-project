@@ -168,8 +168,12 @@ export const runCatchUpEngine = async (state: any, set: any) => {
          const recentMonday = getMostRecentMonday(simDateObj);
          
          if (userCtx.lastReset !== recentMonday && isMonday && needsProcessing) {
-             userCtx.unpaid += userCtx.weekly;
              const removedWeekly = userCtx.weekly;
+             if (removedWeekly < 0) {
+                 userCtx.debt += removedWeekly; // spilled over (negative means it reduces debt)
+             } else {
+                 userCtx.unpaid += removedWeekly; // moves to unpaid
+             }
              userCtx.weekly = 0;
              userCtx.lastReset = recentMonday;
              allInserts.push({ id: Math.random().toString(), user_id: uid, rule_id: 'weekly_reset', timestamp: simDateObj.getTime() + 1000, points_applied: 0, debt_applied: -removedWeekly });

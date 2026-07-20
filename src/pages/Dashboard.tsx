@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { Undo2 } from 'lucide-react';
 import ActionCard from '../components/ActionCard';
 import { useTrackerStore, getGmDate } from '../store/trackerStore';
@@ -14,15 +15,11 @@ export default function Dashboard() {
   const [inputValue, setInputValue] = useState('');
   const [testGmHour, setTestGmHour] = useState('6');
   const [testGmMinute, setTestGmMinute] = useState('00');
-  const [showWelcome, setShowWelcome] = useState(true);
   const [activeDateOffset, setActiveDateOffset] = useState(0); // 0 = today, -1 = yesterday
 
   const now = new Date();
   const todayStr = getGmDate(now);
   const needsGm = lastGmDate !== todayStr;
-
-  const isOpponent = userName !== 'Rico';
-  const welcomeMessage = isOpponent ? 'Welcome Bitch Jigger' : 'Welcome Badman';
 
   if (isLoading) {
     return (
@@ -118,12 +115,26 @@ export default function Dashboard() {
   const daysArray = Array.from({length: 14}, (_, i) => -13 + i).reverse(); // 0 to -13
   const isTodayActive = activeDateOffset === 0;
 
+  const triggerHaptic = () => {
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+  };
+
   const handlePressAction = (rule: any) => {
     if (rule.requires_input) {
       setSelectedRule(rule);
       setInputValue('');
     } else {
+      triggerHaptic();
       logAction(rule);
+      toast.success(`Logged: ${rule.name}`, {
+        style: {
+          borderRadius: '10px',
+          background: '#333',
+          color: '#fff',
+        },
+      });
     }
   };
 
@@ -135,7 +146,15 @@ export default function Dashboard() {
         if (selectedRule.input_step) {
           multiplier = Math.ceil(val / selectedRule.input_step);
         }
+        triggerHaptic();
         logAction(selectedRule, multiplier);
+        toast.success(`Logged: ${selectedRule.name} (${val})`, {
+          style: {
+            borderRadius: '10px',
+            background: '#333',
+            color: '#fff',
+          },
+        });
       }
       setSelectedRule(null);
     }
@@ -143,13 +162,7 @@ export default function Dashboard() {
 
   return (
     <div className="container">
-      {/* Welcome Banner */}
-      {showWelcome && (
-        <div style={{ background: 'var(--brand-blue)', color: 'white', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontWeight: 'bold' }}>
-          <span>{welcomeMessage}</span>
-          <button onClick={() => setShowWelcome(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
-        </div>
-      )}
+      <Toaster position="bottom-center" />
 
       {/* Header / Main Score */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', marginBottom: '60px' }}>

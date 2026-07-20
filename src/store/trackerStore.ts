@@ -508,10 +508,22 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: debtToApply,
     };
 
+    let newWeeklyDebt = get().myWeeklyDebt;
+    let newTotalDebt = get().myTotalDebt;
+
+    if (rule.id === 'ab_3') {
+      // Manual Debt Payoff ALWAYS and ONLY reduces Total Debt
+      newTotalDebt += debtToApply; 
+    } else {
+      // Normal rules affect Weekly Debt (which can go negative during the week)
+      newWeeklyDebt += debtToApply;
+    }
+
     set({
       myPoints: get().myPoints + pointsToApply,
       myDebt: get().myDebt + debtToApply,
-      myWeeklyDebt: get().myWeeklyDebt + debtToApply,
+      myWeeklyDebt: newWeeklyDebt,
+      myTotalDebt: newTotalDebt,
       actionEntries: [...get().actionEntries, newEntry],
     });
 
@@ -529,6 +541,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       my_points: get().myPoints,
       my_debt: get().myDebt,
       my_weekly_debt: get().myWeeklyDebt,
+      my_total_debt: get().myTotalDebt,
     }).eq('user_id', state.userId);
     if (actionErr) alert('Action Update Error: ' + actionErr.message);
   },
