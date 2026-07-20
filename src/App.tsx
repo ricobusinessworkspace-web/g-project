@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Settings, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Settings, BookOpen, BarChart2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import SettingsPage from './pages/Settings';
 import RulesPage from './pages/Rules';
+import Performance from './pages/Performance';
 import { supabase } from './utils/supabase';
 import { useTrackerStore } from './store/trackerStore';
 
@@ -62,6 +63,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/rules" element={<RulesPage />} />
+        <Route path="/performance" element={<Performance />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
@@ -74,6 +76,10 @@ export default function App() {
         <NavLink to="/rules" className={`nav-item ${location.pathname === '/rules' ? 'active' : ''}`}>
           <BookOpen size={24} />
           <span>Rules</span>
+        </NavLink>
+        <NavLink to="/performance" className={`nav-item ${location.pathname === '/performance' ? 'active' : ''}`}>
+          <BarChart2 size={24} />
+          <span>Perf</span>
         </NavLink>
         <NavLink to="/settings" className={`nav-item ${location.pathname === '/settings' ? 'active' : ''}`}>
           <Settings size={24} />

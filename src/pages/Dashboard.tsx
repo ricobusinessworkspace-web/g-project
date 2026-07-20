@@ -15,7 +15,6 @@ export default function Dashboard() {
   const [inputValue, setInputValue] = useState('');
   const [testGmHour, setTestGmHour] = useState('6');
   const [testGmMinute, setTestGmMinute] = useState('00');
-  const [activeDateOffset, setActiveDateOffset] = useState(0);
   const [pullY, setPullY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -94,8 +93,7 @@ export default function Dashboard() {
   }
 
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const startOfSelectedDay = startOfDay + (activeDateOffset * 86400000);
-  const endOfSelectedDay = startOfSelectedDay + 86400000;
+  const endOfDay = startOfDay + 86400000;
 
   const allMyActionsDesc = [...actionEntries].sort((a, b) => b.timestamp - a.timestamp);
   let currentMyPoints = myPoints;
@@ -106,7 +104,7 @@ export default function Dashboard() {
   });
 
   const myTodayActions = myAnnotatedActions
-    .filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled);
+    .filter(a => a.timestamp >= startOfDay && a.timestamp < endOfDay && !a.is_cancelled);
 
   const allOppActionsDesc = [...opponentActionEntries].sort((a, b) => b.timestamp - a.timestamp);
   let currentOppPoints = opponentPoints;
@@ -117,7 +115,7 @@ export default function Dashboard() {
   });
 
   const oppTodayActions = oppAnnotatedActions
-    .filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled);
+    .filter(a => a.timestamp >= startOfDay && a.timestamp < endOfDay && !a.is_cancelled);
 
   const combinedHistory = [...myTodayActions, ...oppTodayActions].sort((a, b) => b.timestamp - a.timestamp);
 
@@ -141,9 +139,6 @@ export default function Dashboard() {
       groupedHistory.push({ ...entry, groupedCount: 1, groupedIds: [entry.id] });
     }
   }
-
-  const daysArray = Array.from({length: 14}, (_, i) => -13 + i).reverse(); // 0 to -13
-  const isTodayActive = activeDateOffset === 0;
 
   const triggerHaptic = () => {
     if (navigator.vibrate) {
@@ -251,38 +246,6 @@ export default function Dashboard() {
         )}
       </div>
 
-
-      {/* Date Ribbon */}
-      <div style={{ width: '100%', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-          {daysArray.map(offset => {
-            const dateObj = new Date(startOfDay + (offset * 86400000));
-            const dayName = offset === 0 ? 'Today' : offset === -1 ? 'Yesterday' : dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-            const dateNum = dateObj.getDate();
-            const isActive = offset === activeDateOffset;
-            
-            return (
-              <div 
-                key={offset}
-                onClick={() => setActiveDateOffset(offset)}
-                style={{ 
-                  flexShrink: 0,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  padding: '10px 16px', borderRadius: '20px', cursor: 'pointer',
-                  background: isActive ? 'var(--accent-color)' : 'transparent',
-                  border: 'none',
-                  color: isActive ? 'white' : 'var(--text-secondary)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: isActive ? 0.9 : 0.6 }}>{dayName}</span>
-                <span style={{ fontSize: '1.2rem', fontWeight: '800', color: isActive ? 'white' : 'var(--text-primary)' }}>{dateNum}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* History Feed */}
       <div style={{ width: '100%', marginBottom: '40px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
@@ -360,7 +323,7 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
-                    {entry.isMe && !entry.is_cancelled && isTodayActive && (
+                    {entry.isMe && !entry.is_cancelled && (
                       <button 
                         onClick={() => undoAction(entry.groupedIds[0])}
                         style={{ background: 'transparent', border: 'none', color: 'var(--error-color)', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}
