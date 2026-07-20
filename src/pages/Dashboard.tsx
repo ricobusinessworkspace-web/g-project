@@ -8,14 +8,14 @@ export default function Dashboard() {
   const { 
     myPoints, myWeeklyDebt, opponentPoints, opponentName, rules, 
     logAction, undoAction, logGm, lastGmDate, isLoading, opponentIsOnline,
-    opponentLastSettlementDate, userName, actionEntries, opponentActionEntries, opponentLastGmDate
+    opponentLastSettlementDate, userName, userId, actionEntries, opponentActionEntries, opponentLastGmDate
   } = useTrackerStore();
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
   const [testGmHour, setTestGmHour] = useState('6');
   const [testGmMinute, setTestGmMinute] = useState('00');
-  const [activeDateOffset, setActiveDateOffset] = useState(0); // 0 = today, -1 = yesterday
+  const [activeDateOffset, setActiveDateOffset] = useState(0);
 
   const now = new Date();
   const todayStr = getGmDate(now);
@@ -94,21 +94,29 @@ export default function Dashboard() {
   const startOfSelectedDay = startOfDay + (activeDateOffset * 86400000);
   const endOfSelectedDay = startOfSelectedDay + 86400000;
 
-  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled).sort((a, b) => a.timestamp - b.timestamp);
-  let myRunning = 5;
-  const myActionsWithRunning = myTodayActions.map(a => {
-    if (a.points_applied !== 0) myRunning += a.points_applied;
-    return { ...a, isMe: true, runningPoints: myRunning };
+  const allMyActionsDesc = [...actionEntries].sort((a, b) => b.timestamp - a.timestamp);
+  let currentMyPoints = myPoints;
+  const myAnnotatedActions = allMyActionsDesc.map(a => {
+    const pointsAtThisTime = currentMyPoints;
+    if (!a.is_cancelled) currentMyPoints -= a.points_applied;
+    return { ...a, isMe: true, runningPoints: pointsAtThisTime };
   });
 
-  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled).sort((a, b) => a.timestamp - b.timestamp);
-  let oppRunning = 5;
-  const oppActionsWithRunning = oppTodayActions.map(a => {
-    if (a.points_applied !== 0) oppRunning += a.points_applied;
-    return { ...a, isMe: false, runningPoints: oppRunning };
+  const myTodayActions = myAnnotatedActions
+    .filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled);
+
+  const allOppActionsDesc = [...opponentActionEntries].sort((a, b) => b.timestamp - a.timestamp);
+  let currentOppPoints = opponentPoints;
+  const oppAnnotatedActions = allOppActionsDesc.map(a => {
+    const pointsAtThisTime = currentOppPoints;
+    if (!a.is_cancelled) currentOppPoints -= a.points_applied;
+    return { ...a, isMe: false, runningPoints: pointsAtThisTime };
   });
 
-  const combinedHistory = [...myActionsWithRunning, ...oppActionsWithRunning].sort((a, b) => b.timestamp - a.timestamp);
+  const oppTodayActions = oppAnnotatedActions
+    .filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay && !a.is_cancelled);
+
+  const combinedHistory = [...myTodayActions, ...oppTodayActions].sort((a, b) => b.timestamp - a.timestamp);
 
   const groupedHistory: any[] = [];
   for (const entry of combinedHistory) {
@@ -179,8 +187,46 @@ export default function Dashboard() {
     }
   };
 
+  const [pullY, setPullY] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const [startY, setStartY] = useState(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      setStartY(e.touches[0].clientY);
+      setIsPulling(true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling) return;
+    const y = e.touches[0].clientY;
+    const diff = y - startY;
+    if (diff > 0 && window.scrollY === 0) {
+      setPullY(Math.min(diff * 0.4, 60)); // max pull 60px
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (!isPulling) return;
+    setIsPulling(false);
+    if (pullY > 50 && userId) {
+      triggerHaptic();
+      toast('Syncing data...', { icon: '🔄', style: { borderRadius: '12px', background: '#333', color: '#fff' } });
+      const { fetchState } = useTrackerStore.getState();
+      await fetchState(userId);
+    }
+    setPullY(0);
+  };
+
   return (
-    <div className="container">
+    <div 
+      className="container"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{ transform: `translateY(${pullY}px)`, transition: isPulling ? 'none' : 'transform 0.3s cubic-bezier(0.1, 1, 0.4, 1)' }}
+    >
       <Toaster position="bottom-center" />
 
       {/* Header / Main Score */}

@@ -38,6 +38,14 @@ export default function App() {
       fetchRules();
       fetchState(session.user.id);
       setupRealtimeSync(session.user.id);
+      
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          fetchState(session.user.id);
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
   }, [session]);
 
