@@ -21,6 +21,7 @@ export interface Rule {
   weekly_max?: number;
   free_uses_per_week?: number;
   miss_penalty?: number;
+  created_at?: string;
 }
 
 export interface ActionEntry {
@@ -133,6 +134,7 @@ interface TrackerState {
   addRule: (rule: Omit<Rule, 'id'>) => Promise<void>;
   updateRule: (rule: Rule) => Promise<void>;
   deleteRule: (ruleId: string) => Promise<void>;
+  reorderRule: (ruleId: string, direction: 'UP' | 'DOWN') => Promise<void>;
   logAction: (rule: Rule, multiplier?: number) => void;
   undoAction: (actionId: string) => void;
   adjustDebt: (type: 'WEEKLY' | 'TOTAL', newAmount: number) => Promise<void>;
@@ -401,6 +403,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         daily_max: r.daily_max || undefined,
         weekly_max: r.weekly_max || undefined,
         free_uses_per_week: r.free_uses_per_week || undefined,
+        created_at: r.created_at,
       }));
       set({ rules: mapped });
     } else {
@@ -454,8 +457,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       return;
     }
     
-    // Optimistic update - realtime will also fire
-    set({ rules: [...get().rules, newRule] });
+    // Refresh to get the actual created_at from DB
+    await get().fetchRules();
   },
 
   updateRule: async (rule: Rule) => {
@@ -494,6 +497,41 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     
     // Optimistic update
     set({ rules: get().rules.filter(r => r.id !== ruleId) });
+  },
+
+  reorderRule: async (ruleId: string, direction: 'UP' | 'DOWN') => {
+    const state = get();
+    const rules = [...state.rules];
+    const ruleIndex = rules.findIndex(r => r.id === ruleId);
+    if (ruleIndex === -1) return;
+
+    const rule = rules[ruleIndex];
+    // Find all rules in the same category
+    const categoryRules = rules.filter(r => r.category === rule.category);
+    // They are already sorted by created_at because fetchRules orders them
+    const catIndex = categoryRules.findIndex(r => r.id === ruleId);
+    
+    if (direction === 'UP' && catIndex > 0) {
+      const swapRule = categoryRules[catIndex - 1];
+      const tempDate = rule.created_at;
+      rule.created_at = swapRule.created_at;
+      swapRule.created_at = tempDate;
+      
+      set({ rules: [...rules] }); // Optimistic UI update
+      
+      await supabase.from('tracker_rules').update({ created_at: rule.created_at }).eq('id', rule.id);
+      await supabase.from('tracker_rules').update({ created_at: swapRule.created_at }).eq('id', swapRule.id);
+    } else if (direction === 'DOWN' && catIndex < categoryRules.length - 1) {
+      const swapRule = categoryRules[catIndex + 1];
+      const tempDate = rule.created_at;
+      rule.created_at = swapRule.created_at;
+      swapRule.created_at = tempDate;
+      
+      set({ rules: [...rules] }); // Optimistic UI update
+      
+      await supabase.from('tracker_rules').update({ created_at: rule.created_at }).eq('id', rule.id);
+      await supabase.from('tracker_rules').update({ created_at: swapRule.created_at }).eq('id', swapRule.id);
+    }
   },
   
   checkAndRunSettlement: async () => {
