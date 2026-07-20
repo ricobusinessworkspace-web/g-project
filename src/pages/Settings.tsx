@@ -7,6 +7,7 @@ export default function SettingsPage() {
   const { 
     isOnline, userId, myTotalDebt, myWeeklyDebt, myUnpaidWeeklyDebt, 
     opponentName, opponentUserId, opponentTotalDebt, opponentWeeklyDebt, opponentActionEntries, 
+    opponentTripAbroad, opponentFamilyTrip, opponentSicko, opponentGoofFreeDayUsed,
     adjustDebt, settleWeeklyDebt,
     myTripAbroad, setTripAbroad,
     myFamilyTrip, setFamilyTrip,
@@ -85,27 +86,38 @@ export default function SettingsPage() {
       <div style={{ marginBottom: '32px' }}>
         <div className="section-title">EXEMPTIONS (EQUAL TAXATION)</div>
         <div className="card-list">
-          <label className="card-row" style={{ cursor: 'pointer' }}>
-            <span className="card-row-label">✈️ Trip Abroad (Goof Free)</span>
-            <label className="switch">
-              <input type="checkbox" checked={myTripAbroad} onChange={(e) => setTripAbroad(e.target.checked)} />
-              <span className="slider"></span>
-            </label>
-          </label>
-          <label className="card-row" style={{ cursor: 'pointer' }}>
-            <span className="card-row-label">👨‍👩‍👧 Family Trip (No Sleep Rules)</span>
-            <label className="switch">
-              <input type="checkbox" checked={myFamilyTrip} onChange={(e) => setFamilyTrip(e.target.checked)} />
-              <span className="slider"></span>
-            </label>
-          </label>
-          <label className="card-row" style={{ cursor: 'pointer' }}>
-            <span className="card-row-label">🤒 Sicko (Krank)</span>
-            <label className="switch">
-              <input type="checkbox" checked={mySicko} onChange={(e) => setSicko(e.target.checked)} />
-              <span className="slider"></span>
-            </label>
-          </label>
+          <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+              <span className="card-row-label">✈️ Trip Abroad (Goof Free)</span>
+              <label className="switch">
+                <input type="checkbox" checked={myTripAbroad} onChange={(e) => setTripAbroad(e.target.checked)} />
+                <span className="slider"></span>
+              </label>
+            </div>
+            {opponentTripAbroad && <span style={{ fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: '500' }}>Active for {opponentName} (Equal Taxation applies)</span>}
+          </div>
+          
+          <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+              <span className="card-row-label">👨‍👩‍👧 Family Trip (No Sleep Rules)</span>
+              <label className="switch">
+                <input type="checkbox" checked={myFamilyTrip} onChange={(e) => setFamilyTrip(e.target.checked)} />
+                <span className="slider"></span>
+              </label>
+            </div>
+            {opponentFamilyTrip && <span style={{ fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: '500' }}>Active for {opponentName} (Equal Taxation applies)</span>}
+          </div>
+          
+          <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+              <span className="card-row-label">🤒 Sicko (Krank)</span>
+              <label className="switch">
+                <input type="checkbox" checked={mySicko} onChange={(e) => setSicko(e.target.checked)} />
+                <span className="slider"></span>
+              </label>
+            </div>
+            {opponentSicko && <span style={{ fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: '500' }}>Active for {opponentName} (Equal Taxation applies)</span>}
+          </div>
           <div className="card-row">
             <span className="card-row-label">🌴 Use Goof Free Day</span>
             <button 
@@ -225,7 +237,7 @@ export default function SettingsPage() {
       {/* Edit Modal */}
       {editModalVisible && (
         <div className="modal-overlay" onClick={() => setEditModalVisible(false)}>
-          <div className="modal-content glass" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3 className="modal-title">
               Adjust {editType === 'WEEKLY' ? 'Weekly Debt' : editType === 'TOTAL' ? 'Total Debt' : editType === 'POINTS' ? 'Total Points' : 'Name'}
             </h3>
