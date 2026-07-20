@@ -5,9 +5,10 @@ import { Rule, useTrackerStore, getRuleUsageStats } from '../store/trackerStore'
 interface ActionCardProps {
   rule: Rule;
   onPress: () => void;
+  hideValue?: boolean;
 }
 
-export default function ActionCard({ rule, onPress }: ActionCardProps) {
+export default function ActionCard({ rule, onPress, hideValue }: ActionCardProps) {
   const { actionEntries } = useTrackerStore();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const IconComponent = (icons as any)[rule.iconName] || icons.Circle;
@@ -48,14 +49,16 @@ export default function ActionCard({ rule, onPress }: ActionCardProps) {
           {usageText && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{usageText} used</span>}
         </div>
       </div>
-      <div style={{ 
-        padding: '4px 8px', 
-        fontWeight: '800',
-        fontSize: '1.1rem',
-        color: isPositiveForOpponent ? 'var(--error-color)' : 'var(--accent-color)'
-      }}>
-        {displayValue}
-      </div>
+      {!hideValue && (
+        <div style={{ 
+          padding: '4px 8px', 
+          fontWeight: '800',
+          fontSize: '1.1rem',
+          color: isPositiveForOpponent ? 'var(--error-color)' : 'var(--accent-color)'
+        }}>
+          {displayValue}
+        </div>
+      )}
     </div>
   );
 }

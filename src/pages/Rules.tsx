@@ -248,6 +248,7 @@ export default function RulesPage() {
                 <ActionCard
                   rule={rule}
                   onPress={() => handlePressAction(rule)}
+                  hideValue={isEditing}
                 />
               </div>
             ))}
