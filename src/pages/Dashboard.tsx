@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [testGmHour, setTestGmHour] = useState('6');
   const [testGmMinute, setTestGmMinute] = useState('00');
   const [showWelcome, setShowWelcome] = useState(true);
+  const [activeDateOffset, setActiveDateOffset] = useState(0); // 0 = today, -1 = yesterday
 
   const now = new Date();
   const todayStr = getGmDate(now);
@@ -95,9 +96,15 @@ export default function Dashboard() {
     : `${Math.abs(diff)} point${Math.abs(diff) > 1 ? 's' : ''} ${isWinning ? 'better' : 'worse'} than ${oppName}`;
 
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfDay).map(a => ({...a, isMe: true}));
-  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfDay).map(a => ({...a, isMe: false}));
+  const startOfSelectedDay = startOfDay + (activeDateOffset * 86400000);
+  const endOfSelectedDay = startOfSelectedDay + 86400000;
+
+  const myTodayActions = actionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay).map(a => ({...a, isMe: true}));
+  const oppTodayActions = opponentActionEntries.filter(a => a.timestamp >= startOfSelectedDay && a.timestamp < endOfSelectedDay).map(a => ({...a, isMe: false}));
   const combinedHistory = [...myTodayActions, ...oppTodayActions].sort((a, b) => b.timestamp - a.timestamp);
+
+  const daysArray = Array.from({length: 14}, (_, i) => -13 + i).reverse(); // 0 to -13
+  const isTodayActive = activeDateOffset === 0;
 
   const handlePressAction = (rule: any) => {
     if (rule.requires_input) {
@@ -156,12 +163,44 @@ export default function Dashboard() {
       </div>
 
 
+      {/* Date Ribbon */}
+      <div style={{ width: '100%', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+          {daysArray.map(offset => {
+            const dateObj = new Date(startOfDay + (offset * 86400000));
+            const dayName = offset === 0 ? 'Today' : offset === -1 ? 'Yesterday' : dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+            const dateNum = dateObj.getDate();
+            const isActive = offset === activeDateOffset;
+            
+            return (
+              <div 
+                key={offset}
+                onClick={() => setActiveDateOffset(offset)}
+                style={{ 
+                  flexShrink: 0,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  padding: '10px 16px', borderRadius: '20px', cursor: 'pointer',
+                  background: isActive ? 'var(--accent-color)' : 'var(--card-bg)',
+                  border: isActive ? 'none' : '1px solid var(--card-border)',
+                  color: isActive ? 'white' : 'var(--text-secondary)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: isActive ? 0.9 : 0.6 }}>{dayName}</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: '800', color: isActive ? 'white' : 'var(--text-primary)' }}>{dateNum}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* History Feed */}
-      <div style={{ width: '100%' }}>
-        <div className="section-title">TODAY'S HISTORY</div>
-        <div className="card-list">
+      <div style={{ width: '100%', marginBottom: '40px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {combinedHistory.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>No actions tracked today yet.</div>
+            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', background: 'var(--card-bg)', borderRadius: '20px', border: '1px solid var(--card-border)' }}>
+              No actions tracked on this day.
+            </div>
           ) : (
             combinedHistory.map(entry => {
               const rule = rules.find(r => r.id === entry.rule_id);
@@ -177,30 +216,38 @@ export default function Dashboard() {
               const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               
               return (
-                <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--card-border)', opacity: entry.is_cancelled ? 0.5 : 1 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
-                    <span style={{ fontWeight: '600', color: entry.isMe ? 'white' : 'var(--text-secondary)' }}>
-                      {entry.isMe ? 'You' : oppName}: {ruleName}
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{timeStr}</span>
+                <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--card-bg)', borderRadius: '20px', border: '1px solid var(--card-border)', opacity: entry.is_cancelled ? 0.4 : 1, transition: 'opacity 0.2s ease' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: entry.isMe ? 'rgba(52,199,89,0.1)' : 'rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: entry.isMe ? 'var(--accent-color)' : 'var(--text-secondary)', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      {entry.isMe ? 'YOU' : oppName.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {ruleName}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{timeStr}</span>
+                    </div>
                   </div>
+                  
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontWeight: 'bold', color: entry.points_applied > 0 ? 'var(--error-color)' : (entry.points_applied < 0 ? 'var(--accent-color)' : 'var(--text-secondary)'), textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textDecoration: entry.is_cancelled ? 'line-through' : 'none' }}>
                       {entry.points_applied !== 0 && (
-                        <span>{entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts</span>
+                        <div style={{ background: entry.points_applied > 0 ? 'rgba(255,69,58,0.15)' : 'rgba(52,199,89,0.15)', color: entry.points_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', padding: '4px 10px', borderRadius: '12px', fontWeight: '800', fontSize: '0.9rem' }}>
+                          {entry.points_applied > 0 ? '+' : ''}{entry.points_applied} pts
+                        </div>
                       )}
                       {entry.debt_applied !== 0 && (
-                        <span style={{ display: 'block', fontSize: '0.8rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : '#34C759' }}>
-                          {entry.debt_applied > 0 ? '+' : ''}{entry.debt_applied}€ debt
-                        </span>
+                        <div style={{ color: entry.debt_applied > 0 ? 'var(--error-color)' : '#34C759', fontWeight: '800', fontSize: '0.85rem', marginTop: '4px' }}>
+                          {entry.debt_applied > 0 ? '+' : ''}{entry.debt_applied}€
+                        </div>
                       )}
                     </div>
-                    {entry.isMe && !entry.is_cancelled && (
+                    {entry.isMe && !entry.is_cancelled && isTodayActive && (
                       <button 
                         onClick={() => undoAction(entry.id)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--error-color)', cursor: 'pointer', padding: '4px' }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--error-color)', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}
                       >
-                        <Undo2 size={18} />
+                        <Undo2 size={20} />
                       </button>
                     )}
                   </div>
