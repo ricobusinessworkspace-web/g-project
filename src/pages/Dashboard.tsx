@@ -77,20 +77,18 @@ export default function Dashboard() {
   if (currentHours >= 7) currentSleepTax += 5;
   if (currentHours >= 8) currentSleepTax += 5;
 
-  let displayOpponentPoints = 5;
-  if (opponentLastSettlementDate === todayStr) {
-    displayOpponentPoints = opponentPoints;
-  }
-  if (opponentLastGmDate !== todayStr) {
-    displayOpponentPoints += currentSleepTax;
-  }
-
-  const diff = myPoints - displayOpponentPoints;
-  const isWinning = diff <= 0; 
   const oppName = opponentName || 'Bitch Jigger';
-  const diffText = diff === 0 
-    ? `Tied with ${oppName}` 
-    : `${Math.abs(diff)} point${Math.abs(diff) > 1 ? 's' : ''} ${isWinning ? 'better' : 'worse'} than ${oppName}`;
+  
+  let diffText = "";
+  if (opponentLastGmDate !== todayStr) {
+    diffText = `${oppName} is still sleepy`;
+  } else {
+    let displayOpponentPoints = 5;
+    if (opponentLastSettlementDate === todayStr) {
+      displayOpponentPoints = opponentPoints;
+    }
+    diffText = `${oppName}: ${displayOpponentPoints} pts`;
+  }
 
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const startOfSelectedDay = startOfDay + (activeDateOffset * 86400000);
