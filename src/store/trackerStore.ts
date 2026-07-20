@@ -547,7 +547,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const todayStr = getGmDate(wakeTime); 
 
-    let sleepTax = 0; // +5 for breathing base tax is already applied during settlement
+    let sleepTax = 5; // Base tax +5 for waking up / breathing
     const hours = wakeTime.getHours();
     
     // Equal taxation for Family Trip -> No sleep rules

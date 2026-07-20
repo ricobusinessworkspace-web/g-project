@@ -13,8 +13,8 @@ export default function Dashboard() {
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
-  const [testGmHour, setTestGmHour] = useState('6');
-  const [testGmMinute, setTestGmMinute] = useState('00');
+  const [testGmHour, setTestGmHour] = useState(new Date().getHours().toString());
+  const [testGmMinute, setTestGmMinute] = useState(new Date().getMinutes().toString().padStart(2, '0'));
   const [pullY, setPullY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -66,6 +66,15 @@ export default function Dashboard() {
           }}
         >
           Set GM
+        </button>
+        <button 
+          className="modal-btn" 
+          style={{ width: '220px', background: 'var(--accent-color)', color: 'white', marginTop: '10px' }}
+          onClick={() => {
+            logGm(new Date());
+          }}
+        >
+          I'm Awake (Now)
         </button>
         <p style={{ color: 'var(--text-secondary)' }}>Enter time and tap to calculate Sleep Tax.</p>
       </div>
