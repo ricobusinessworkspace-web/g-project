@@ -558,7 +558,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const todayStr = getGmDate(wakeTime); 
 
-    let sleepTax = 5; // Base tax +5 for waking up / breathing
+    let sleepTax = 0; // Pure sleep penalty on top of base 5
     const hours = wakeTime.getHours();
     
     // Equal taxation for Family Trip -> No sleep rules
@@ -582,9 +582,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: 0,
     });
 
-    // myPoints already contains the 5 base points (from the daily reset)
-    // We just need to add the extra penalty. If sleepTax is 5 (woke up on time), we add 0.
-    const newPoints = get().myPoints + (sleepTax - 5); 
+    const newPoints = get().myPoints + sleepTax; 
     
     const { error: updateErr } = await supabase.from('tracker_user_stats').update({
       my_points: newPoints,

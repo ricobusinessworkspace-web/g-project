@@ -67,23 +67,16 @@ export const runCatchUpEngine = async (state: any, set: any) => {
     const { data: actions } = await supabase.from('tracker_action_entries')
       .select('*').eq('user_id', uid).gte('timestamp', start).lt('timestamp', end);
     
-    let totalPoints = 0;
+    let totalPoints = 5; // Base breathing tax is always applied
     let hasDailyDebt = false;
     
     if (actions && actions.length > 0) {
-       let hasGm = false;
        for (const a of actions) {
            if (!a.is_cancelled) {
                totalPoints += a.points_applied;
-               if (a.rule_id === 'gm_1') hasGm = true;
                if (a.rule_id === 'daily_debt_settlement') hasDailyDebt = true;
            }
        }
-       if (!hasGm) {
-           totalPoints += 5; // Base breathing tax if they forgot to log GM
-       }
-    } else {
-       totalPoints += 5; // Base breathing tax for completely empty days
     }
     
     return { start, actions: actions || [], totalPoints, hasDailyDebt };
