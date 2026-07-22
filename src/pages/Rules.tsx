@@ -49,7 +49,6 @@ const emptyForm: RuleFormState = {
   free_uses_per_week: '',
   requires_input: false,
   input_step: '',
-  input_step: '',
   time_modifier: '',
 };
 
