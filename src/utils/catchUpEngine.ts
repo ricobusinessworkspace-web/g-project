@@ -68,7 +68,6 @@ export const runCatchUpEngine = async (state: any, set: any) => {
       .select('*').eq('user_id', uid).gte('timestamp', start).lt('timestamp', end);
     
     let totalPoints = 0;
-    let hasMandatoryPenalty = false;
     let hasDailyDebt = false;
     
     if (actions && actions.length > 0) {
@@ -77,7 +76,6 @@ export const runCatchUpEngine = async (state: any, set: any) => {
            if (!a.is_cancelled) {
                totalPoints += a.points_applied;
                if (a.rule_id === 'gm_1') hasGm = true;
-               if (a.rule_id === 'mandatory_penalty') hasMandatoryPenalty = true;
                if (a.rule_id === 'daily_debt_settlement') hasDailyDebt = true;
            }
        }
@@ -88,43 +86,7 @@ export const runCatchUpEngine = async (state: any, set: any) => {
        totalPoints += 5; // Base breathing tax for completely empty days
     }
     
-    return { start, actions: actions || [], totalPoints, hasMandatoryPenalty, hasDailyDebt };
-  };
-
-  const calcMandatoryPenalty = (actions: any[]) => {
-    let pen = 0;
-    let hasSufficientExercise = false;
-    const exerciseCounts: Record<string, number> = {};
-    const rules = useTrackerStore.getState().rules;
-    for (const action of actions) {
-      const rule = rules.find(r => r.id === action.rule_id);
-      if (rule && rule.category === 'EXERCISE' && !action.is_cancelled) {
-        const actionDate = new Date(action.timestamp);
-        const isBefore6am = actionDate.getHours() < 6;
-        const factor = rule.time_modifier === 'DOUBLE_BEFORE_6AM' && isBefore6am ? 2 : 1;
-        let multiplier = 1;
-        if (rule.base_value !== 0) {
-           multiplier = action.points_applied / (rule.base_value * factor);
-           if (isNaN(multiplier) || multiplier <= 0) multiplier = 1;
-           multiplier = Math.round(multiplier);
-        }
-        exerciseCounts[action.rule_id] = (exerciseCounts[action.rule_id] || 0) + multiplier;
-        if (exerciseCounts[action.rule_id] >= 3) hasSufficientExercise = true;
-      }
-    }
-    if (!hasSufficientExercise) pen += 3;
-    
-    // Dynamically apply miss_penalty for any rule that has it set
-    for (const rule of rules) {
-      if (rule.miss_penalty && rule.miss_penalty > 0) {
-        // If they didn't log this rule today, add the penalty
-        if (!actions.some(a => a.rule_id === rule.id && !a.is_cancelled)) {
-          pen += rule.miss_penalty;
-        }
-      }
-    }
-
-    return pen;
+    return { start, actions: actions || [], totalPoints, hasDailyDebt };
   };
 
   let allInserts: any[] = [];
@@ -142,21 +104,6 @@ export const runCatchUpEngine = async (state: any, set: any) => {
      const myData = await getDayData(state.userId, currentSimDate);
      const oppData = state.opponentUserId ? await getDayData(state.opponentUserId, currentSimDate) : null;
      
-     if (myNeedsProcessing && !ctx[state.userId].isExempt && !myData.hasMandatoryPenalty) {
-        const pen = calcMandatoryPenalty(myData.actions);
-        if (pen > 0) {
-            allInserts.push({ id: Math.random().toString(), user_id: state.userId, rule_id: 'mandatory_penalty', timestamp: simTimestampStr, points_applied: pen, debt_applied: 0 });
-            myData.totalPoints += pen;
-        }
-     }
-     if (oppNeedsProcessing && state.opponentUserId && !ctx[state.opponentUserId].isExempt && !oppData!.hasMandatoryPenalty) {
-        const pen = calcMandatoryPenalty(oppData!.actions);
-        if (pen > 0) {
-            allInserts.push({ id: Math.random().toString(), user_id: state.opponentUserId, rule_id: 'mandatory_penalty', timestamp: simTimestampStr, points_applied: pen, debt_applied: 0 });
-            oppData!.totalPoints += pen;
-        }
-     }
-
      const uidsToProcessDailyDebt = [];
      if (myNeedsProcessing && !myData.hasDailyDebt) uidsToProcessDailyDebt.push(state.userId);
      if (oppNeedsProcessing && state.opponentUserId && !oppData!.hasDailyDebt) uidsToProcessDailyDebt.push(state.opponentUserId);
