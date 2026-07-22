@@ -260,9 +260,11 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     }
 
 
+    const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).getTime();
+
     const { data: actionsData, error: actionsError } = await supabase.from('tracker_action_entries')
       .select('*')
-      .gte('timestamp', startOfMonth);
+      .gte('timestamp', thirtyDaysAgo);
       
     if (actionsError) alert('Fetch Actions Error: ' + actionsError.message);
       

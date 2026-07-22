@@ -20,7 +20,27 @@ export default function Performance() {
   // 1. Data Preparation: Daily Points (Last 14 Days)
   const dailyChartData = useMemo(() => {
     const data = [];
-    for (let i = 13; i >= 0; i--) {
+    
+    // Find the earliest action timestamp to determine how far back to render
+    let minTimestamp = startOfToday;
+    const allActions = [...actionEntries, ...opponentActionEntries].filter(a => !a.is_cancelled);
+    for (const a of allActions) {
+      if (a.timestamp < minTimestamp) minTimestamp = a.timestamp;
+    }
+    
+    // We render up to 14 days, but bounded by the earliest action
+    const maxDays = 13;
+    let daysToDisplay = Math.floor((startOfToday - minTimestamp) / 86400000);
+    if (daysToDisplay > maxDays) daysToDisplay = maxDays;
+    if (daysToDisplay < 0) daysToDisplay = 0;
+
+    let currentMyPoints = myPoints;
+    let currentOppPoints = opponentPoints;
+    let currentMyDebt = myTotalDebt;
+    let currentOppDebt = opponentTotalDebt;
+
+    // Work backwards from today to build the end-of-day history
+    for (let i = 0; i <= daysToDisplay; i++) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const start = d.getTime();
       const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1).getTime();
@@ -28,38 +48,43 @@ export default function Performance() {
       const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
       const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
       
-      let myDayPoints = 5;
+      data.unshift({
+        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        dateValue: start,
+        You: currentMyPoints,
+        [oppName]: currentOppPoints,
+        myDebt: currentMyDebt,
+        oppDebt: currentOppDebt
+      });
+
+      // To find the total at the end of the PREVIOUS day (i+1),
+      // subtract today's points/debt. Note that each completed day adds a base 5 points in catchUpEngine!
+      // But for today (i=0), the catchUpEngine hasn't run yet, so the base 5 isn't officially in myPoints yet,
+      // EXCEPT that visually in the app we treat the base 5 as part of the daily running points.
+      // Actually, if we just subtract points_applied and the base 5 for past days:
+      let myDayPoints = i > 0 ? 5 : 0; 
       let myDayDebt = 0;
       for (const a of myDayActions) {
         myDayPoints += a.points_applied;
         myDayDebt += a.debt_applied;
       }
       
-      let oppDayPoints = 5;
+      let oppDayPoints = i > 0 ? 5 : 0;
       let oppDayDebt = 0;
       for (const a of oppDayActions) {
         oppDayPoints += a.points_applied;
         oppDayDebt += a.debt_applied;
       }
       
-      // If it's today (i===0), the user wants the graph to show 0 until the day is over
-      if (i === 0) {
-        myDayPoints = 0;
-        oppDayPoints = 0;
-      }
-
-      data.push({
-        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        dateValue: start,
-        You: myDayPoints,
-        [oppName]: oppDayPoints,
-        myDebt: myDayDebt,
-        oppDebt: oppDayDebt
-      });
+      currentMyPoints -= myDayPoints;
+      currentOppPoints -= oppDayPoints;
+      currentMyDebt -= myDayDebt;
+      currentOppDebt -= oppDayDebt;
     }
+    
     return data;
-  }, [actionEntries, opponentActionEntries, now, oppName]);
+  }, [actionEntries, opponentActionEntries, now, oppName, myPoints, opponentPoints, myTotalDebt, opponentTotalDebt]);
 
   // Intraday Data
   const intradayData = useMemo(() => {
@@ -289,15 +314,24 @@ export default function Performance() {
         <h3 style={{ marginLeft: '10px', marginBottom: '20px', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Debt Activity</h3>
         <div style={{ width: '100%', height: 200 }}>
           <ResponsiveContainer>
-            <BarChart data={dailyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={dailyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorMyDebt" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#FF3B30" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#FF3B30" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorOppDebt" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#FF9F0A" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#FF9F0A" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis dataKey="fullDate" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
               <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-              <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
-              <Bar dataKey="myDebt" name="You (Debt)" fill="#FF3B30" radius={[4, 4, 4, 4]} />
-              <Bar dataKey="oppDebt" name={`${oppName} (Debt)`} fill="#FF9F0A" radius={[4, 4, 4, 4]} />
-            </BarChart>
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="myDebt" name="You (Debt)" stroke="#FF3B30" strokeWidth={3} fillOpacity={1} fill="url(#colorMyDebt)" />
+              <Area type="monotone" dataKey="oppDebt" name={`${oppName} (Debt)`} stroke="#FF9F0A" strokeWidth={3} fillOpacity={1} fill="url(#colorOppDebt)" />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -306,7 +340,7 @@ export default function Performance() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
         <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
           <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
-            Top Negative Impact
+            Worst Penalties
           </div>
           <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--error-color)' }}>
             {topPositiveRule ? topPositiveRule.name : 'None'}
@@ -314,7 +348,7 @@ export default function Performance() {
         </div>
         <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
           <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
-            Top Positive Impact
+            Best Helpers
           </div>
           <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-color)' }}>
             {topNegativeRule ? topNegativeRule.name : 'None'}
