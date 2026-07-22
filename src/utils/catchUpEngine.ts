@@ -104,28 +104,6 @@ export const runCatchUpEngine = async (state: any, set: any) => {
      const myData = await getDayData(state.userId, currentSimDate);
      const oppData = state.opponentUserId ? await getDayData(state.opponentUserId, currentSimDate) : null;
      
-     const uidsToProcessDailyDebt = [];
-     if (myNeedsProcessing && !myData.hasDailyDebt) uidsToProcessDailyDebt.push(state.userId);
-     if (oppNeedsProcessing && state.opponentUserId && !oppData!.hasDailyDebt) uidsToProcessDailyDebt.push(state.opponentUserId);
-
-     if (uidsToProcessDailyDebt.length > 0 && oppData && !ctx[state.userId].isExempt) {
-         let diff = myData.totalPoints - oppData.totalPoints;
-         let debtAmount = 0;
-         let absDiff = Math.abs(diff);
-         if (absDiff > 0 && absDiff <= 9) debtAmount = 5;
-         else if (absDiff >= 10 && absDiff <= 19) debtAmount = 10;
-         else if (absDiff >= 20) debtAmount = 15;
-         
-         if (debtAmount > 0) {
-             const loserId = diff > 0 ? state.userId : state.opponentUserId;
-             if (uidsToProcessDailyDebt.includes(loserId)) {
-                 allInserts.push({ id: Math.random().toString(), user_id: loserId, rule_id: 'daily_debt_settlement', timestamp: simTimestampStr, points_applied: 0, debt_applied: debtAmount });
-                 ctx[loserId].weekly += debtAmount;
-                 ctx[loserId].debt += debtAmount;
-             }
-         }
-     }
-
      const processDebtForUser = (uid: string, needsProcessing: boolean) => {
          const userCtx = ctx[uid];
          const recentMonday = getMostRecentMonday(simDateObj);
@@ -155,6 +133,28 @@ export const runCatchUpEngine = async (state: any, set: any) => {
 
      if (myNeedsProcessing) processDebtForUser(state.userId, true);
      if (oppNeedsProcessing && state.opponentUserId) processDebtForUser(state.opponentUserId, true);
+
+     const uidsToProcessDailyDebt = [];
+     if (myNeedsProcessing && !myData.hasDailyDebt) uidsToProcessDailyDebt.push(state.userId);
+     if (oppNeedsProcessing && state.opponentUserId && !oppData!.hasDailyDebt) uidsToProcessDailyDebt.push(state.opponentUserId);
+
+     if (uidsToProcessDailyDebt.length > 0 && oppData && !ctx[state.userId].isExempt) {
+         let diff = myData.totalPoints - oppData.totalPoints;
+         let debtAmount = 0;
+         let absDiff = Math.abs(diff);
+         if (absDiff > 0 && absDiff <= 9) debtAmount = 5;
+         else if (absDiff >= 10 && absDiff <= 19) debtAmount = 10;
+         else if (absDiff >= 20) debtAmount = 15;
+         
+         if (debtAmount > 0) {
+             const loserId = diff > 0 ? state.userId : state.opponentUserId;
+             if (uidsToProcessDailyDebt.includes(loserId)) {
+                 allInserts.push({ id: Math.random().toString(), user_id: loserId, rule_id: 'daily_debt_settlement', timestamp: simTimestampStr, points_applied: 0, debt_applied: debtAmount });
+                 ctx[loserId].weekly += debtAmount;
+                 ctx[loserId].debt += debtAmount;
+             }
+         }
+     }
 
      const nextDay = new Date(simDateObj.getTime() + 86400000);
      currentSimDate = getISODate(nextDay);

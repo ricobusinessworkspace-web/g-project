@@ -582,7 +582,9 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: 0,
     });
 
-    const newPoints = get().myPoints + sleepTax; 
+    // myPoints already contains the 5 base points (from the daily reset)
+    // We just need to add the extra penalty. If sleepTax is 5 (woke up on time), we add 0.
+    const newPoints = get().myPoints + (sleepTax - 5); 
     
     const { error: updateErr } = await supabase.from('tracker_user_stats').update({
       my_points: newPoints,
