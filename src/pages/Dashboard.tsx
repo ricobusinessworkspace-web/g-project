@@ -13,8 +13,6 @@ export default function Dashboard() {
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
-  const [testGmHour, setTestGmHour] = useState(new Date().getHours().toString());
-  const [testGmMinute, setTestGmMinute] = useState(new Date().getMinutes().toString().padStart(2, '0'));
   const [pullY, setPullY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -34,49 +32,41 @@ export default function Dashboard() {
 
   if (needsGm) {
     return (
-      <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '20px' }}>
-        <h2 style={{ color: 'white' }}>Set Wake Up Time (Test)</h2>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <input 
-            className="modal-input" 
-            style={{ width: '100px' }} 
-            value={testGmHour} 
-            onChange={e => setTestGmHour(e.target.value)} 
-            type="number" 
-            placeholder="HH" 
-          />
-          <span style={{ fontSize: '40px', fontWeight: 'bold' }}>:</span>
-          <input 
-            className="modal-input" 
-            style={{ width: '100px' }} 
-            value={testGmMinute} 
-            onChange={e => setTestGmMinute(e.target.value)} 
-            type="number" 
-            placeholder="MM" 
-          />
-        </div>
+      <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '32px' }}>
+        <h2 style={{ color: 'white', fontSize: '2.5rem', fontWeight: '800', margin: 0 }}>Good Morning</h2>
+        
         <button 
-          className="modal-btn modal-btn-primary" 
-          style={{ width: '220px', background: 'white', color: 'black' }}
-          onClick={() => {
-            const d = new Date();
-            d.setHours(parseInt(testGmHour, 10) || 0);
-            d.setMinutes(parseInt(testGmMinute, 10) || 0);
-            logGm(d);
+          onClick={(e) => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+            setTimeout(() => logGm(new Date()), 150);
+          }}
+          style={{ 
+            width: '220px', 
+            height: '220px', 
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #FF9500 0%, #FFCC00 100%)', 
+            color: 'white', 
+            fontSize: '1.4rem',
+            fontWeight: 'bold',
+            border: 'none',
+            boxShadow: '0 8px 32px rgba(255, 149, 0, 0.4)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+            padding: 0
           }}
         >
-          Set GM
+          <span style={{ fontSize: '4rem', lineHeight: 1 }}>☀️</span>
+          <span>I'm Awake</span>
         </button>
-        <button 
-          className="modal-btn" 
-          style={{ width: '220px', background: 'var(--accent-color)', color: 'white', marginTop: '10px' }}
-          onClick={() => {
-            logGm(new Date());
-          }}
-        >
-          I'm Awake (Now)
-        </button>
-        <p style={{ color: 'var(--text-secondary)' }}>Enter time and tap to calculate Sleep Tax.</p>
+        
+        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '280px', marginTop: '16px', lineHeight: '1.5' }}>
+          Tap to start your day and log your wake up time.
+        </p>
       </div>
     );
   }
