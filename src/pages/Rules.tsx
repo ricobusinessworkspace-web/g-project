@@ -18,8 +18,8 @@ import { SortableRuleItem } from '../components/SortableRuleItem';
 import { Rule, useTrackerStore } from '../store/trackerStore';
 import { Plus, X, ChevronDown } from 'lucide-react';
 
-const CATEGORY_ORDER = ['REOCCURING', 'ONCE_DAILY', 'EXERCISE', 'RECREATIONAL', 'BUSINESS', 'ABBAUEN', 'GN'];
-const ALL_CATEGORIES = ['REOCCURING', 'ONCE_DAILY', 'EXERCISE', 'RECREATIONAL', 'BUSINESS', 'ABBAUEN', 'GN', 'GM'];
+const CATEGORY_ORDER = ['REOCCURING', 'ONCE_DAILY', 'EXERCISE', 'RECREATIONAL', 'BUSINESS', 'ABBAUEN', 'GN', 'MANDATORY'];
+const ALL_CATEGORIES = ['REOCCURING', 'ONCE_DAILY', 'EXERCISE', 'RECREATIONAL', 'BUSINESS', 'ABBAUEN', 'GN', 'GM', 'MANDATORY'];
 const ICON_OPTIONS = ['Sun', 'Moon', 'Clock', 'Bed', 'Cat', 'Phone', 'Pill', 'Pizza', 'Smartphone', 'Flame', 'MonitorPlay', 'Lock', 'Hand', 'Dumbbell', 'Activity', 'Footprints', 'Swords', 'Banknote', 'PhoneCall', 'Camera', 'ThermometerSnowflake', 'Code', 'BookOpen', 'Headphones', 'Gamepad2', 'Book', 'Wind', 'PenTool', 'Circle', 'Star', 'Heart', 'Zap', 'Coffee', 'Music', 'Bike', 'Car', 'Plane', 'Globe', 'Shield', 'Award'];
 
 interface RuleFormState {
