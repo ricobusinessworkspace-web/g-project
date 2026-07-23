@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
   const [showDebtDropdown, setShowDebtDropdown] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'me' | 'mate'>('all');
   const [pullY, setPullY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -220,6 +221,13 @@ export default function Dashboard() {
     setPullY(0);
   };
 
+  const filteredHistory = groupedHistory.filter(entry => {
+    if (historyFilter === 'all') return true;
+    if (historyFilter === 'me') return entry.isMe;
+    if (historyFilter === 'mate') return !entry.isMe;
+    return true;
+  });
+
   return (
     <div 
       className="container"
@@ -289,13 +297,21 @@ export default function Dashboard() {
 
       {/* History Feed */}
       <div style={{ width: '100%', marginBottom: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Today's Log</div>
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '4px' }}>
+            <button onClick={() => setHistoryFilter('all')} style={{ background: historyFilter === 'all' ? 'var(--accent-color)' : 'transparent', color: historyFilter === 'all' ? 'white' : 'var(--text-secondary)', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}>All</button>
+            <button onClick={() => setHistoryFilter('me')} style={{ background: historyFilter === 'me' ? 'var(--accent-color)' : 'transparent', color: historyFilter === 'me' ? 'white' : 'var(--text-secondary)', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}>You</button>
+            <button onClick={() => setHistoryFilter('mate')} style={{ background: historyFilter === 'mate' ? 'var(--accent-color)' : 'transparent', color: historyFilter === 'mate' ? 'white' : 'var(--text-secondary)', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}>{oppName.substring(0, 4)}</button>
+          </div>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
-          {groupedHistory.length === 0 ? (
+          {filteredHistory.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               No actions tracked on this day.
             </div>
           ) : (
-            groupedHistory.map(entry => {
+            filteredHistory.map(entry => {
               const rule = rules.find(r => r.id === entry.rule_id);
               let ruleName = rule ? rule.name : 'Unknown';
               if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
