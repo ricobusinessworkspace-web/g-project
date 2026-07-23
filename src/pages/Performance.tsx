@@ -55,14 +55,11 @@ export default function Performance() {
         You: currentMyPoints,
         [oppName]: currentOppPoints,
         myDebt: currentMyDebt,
-        oppDebt: currentOppDebt
+        oppDebt: currentOppDebt,
+        myDayEarned: i > 0 ? 5 : 0, // Placeholder, will update below
+        oppDayEarned: i > 0 ? 5 : 0 // Placeholder, will update below
       });
 
-      // To find the total at the end of the PREVIOUS day (i+1),
-      // subtract today's points/debt. Note that each completed day adds a base 5 points in catchUpEngine!
-      // But for today (i=0), the catchUpEngine hasn't run yet, so the base 5 isn't officially in myPoints yet,
-      // EXCEPT that visually in the app we treat the base 5 as part of the daily running points.
-      // Actually, if we just subtract points_applied and the base 5 for past days:
       let myDayPoints = i > 0 ? 5 : 0; 
       let myDayDebt = 0;
       for (const a of myDayActions) {
@@ -77,6 +74,9 @@ export default function Performance() {
         oppDayDebt += a.debt_applied;
       }
       
+      data[0].myDayEarned = myDayPoints;
+      data[0].oppDayEarned = oppDayPoints;
+
       currentMyPoints -= myDayPoints;
       currentOppPoints -= oppDayPoints;
       currentMyDebt -= myDayDebt;
@@ -353,6 +353,35 @@ export default function Performance() {
           <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-color)' }}>
             {topNegativeRule ? topNegativeRule.name : 'None'}
           </div>
+        </div>
+      </div>
+
+      {/* Daily Summary Table */}
+      <div style={{ marginBottom: '40px' }}>
+        <h3 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Daily Summary</h3>
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                <th style={{ padding: '12px 16px', fontWeight: 'bold' }}>Date</th>
+                <th style={{ padding: '12px 16px', fontWeight: 'bold' }}>Earned</th>
+                <th style={{ padding: '12px 16px', fontWeight: 'bold' }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...dailyChartData].reverse().map((day: any) => {
+                const earnedColor = day.myDayEarned > 5 ? 'var(--error-color)' : day.myDayEarned < 5 ? 'var(--accent-color)' : 'var(--text-primary)';
+                const sign = day.myDayEarned > 0 ? '+' : '';
+                return (
+                  <tr key={day.dateValue} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>{day.fullDate}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', color: earnedColor, fontWeight: 'bold' }}>{sign}{day.myDayEarned}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{day.You}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
