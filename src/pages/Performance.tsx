@@ -48,61 +48,64 @@ export default function Performance() {
       const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
       const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
       
-      data.unshift({
-        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        dateValue: start,
-        You: currentMyPoints,
-        [oppName]: currentOppPoints,
-        myDebt: currentMyDebt,
-        oppDebt: currentOppDebt,
-        myDayEarned: i > 0 ? 5 : 0, // Placeholder, will update below
-        oppDayEarned: i > 0 ? 5 : 0 // Placeholder, will update below
-      });
-
-      let myDayPoints = i > 0 ? 5 : 0; 
+      let myDayPoints = 5; 
       let myDayDebt = 0;
       for (const a of myDayActions) {
         myDayPoints += a.points_applied;
         myDayDebt += a.debt_applied;
       }
       
-      let oppDayPoints = i > 0 ? 5 : 0;
+      let oppDayPoints = 5;
       let oppDayDebt = 0;
       for (const a of oppDayActions) {
         oppDayPoints += a.points_applied;
         oppDayDebt += a.debt_applied;
       }
-      
-      data[0].myDayEarned = myDayPoints;
-      data[0].oppDayEarned = oppDayPoints;
 
-      currentMyPoints -= myDayPoints;
-      currentOppPoints -= oppDayPoints;
+      data.unshift({
+        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        dateValue: start,
+        You: myDayPoints,
+        [oppName]: oppDayPoints,
+        myDebt: currentMyDebt,
+        oppDebt: currentOppDebt,
+        myDayEarned: myDayPoints,
+        oppDayEarned: oppDayPoints
+      });
+
       currentMyDebt -= myDayDebt;
       currentOppDebt -= oppDayDebt;
     }
     
     return data;
-  }, [actionEntries, opponentActionEntries, now, oppName, myPoints, opponentPoints, myTotalDebt, opponentTotalDebt]);
+  }, [actionEntries, opponentActionEntries, now, oppName, myTotalDebt, opponentTotalDebt]);
 
   // Intraday Data
   const intradayData = useMemo(() => {
     const data = [];
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    data.push({
-      time: '00:00',
-      fullDate: '00:00',
-      You: 5,
-      [oppName]: 5
-    });
-
-    let myRunning = 5;
-    let oppRunning = 5;
 
     const allToday = [...actionEntries, ...opponentActionEntries]
       .filter(a => a.timestamp >= start && !a.is_cancelled)
       .sort((a, b) => a.timestamp - b.timestamp);
+
+    let myTodayEarned = 0;
+    let oppTodayEarned = 0;
+    for (const a of allToday) {
+      if (a.user_id === userId) myTodayEarned += a.points_applied;
+      else oppTodayEarned += a.points_applied;
+    }
+
+    let myRunning = myPoints - myTodayEarned;
+    let oppRunning = opponentPoints - oppTodayEarned;
+
+    data.push({
+      time: '00:00',
+      fullDate: '00:00',
+      You: myRunning,
+      [oppName]: oppRunning
+    });
 
     for (const a of allToday) {
       if (a.user_id === userId) myRunning += a.points_applied;
@@ -127,7 +130,7 @@ export default function Performance() {
     });
 
     return data;
-  }, [actionEntries, opponentActionEntries, now, oppName, userId]);
+  }, [actionEntries, opponentActionEntries, now, oppName, userId, myPoints, opponentPoints]);
 
   const weeklyDebtChartData = useMemo(() => {
     const data = [];
@@ -152,8 +155,12 @@ export default function Performance() {
       const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee');
       const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee');
 
-      for (const a of myDayActions) myRunningDebt += a.debt_applied || 0;
-      for (const a of oppDayActions) oppRunningDebt += a.debt_applied || 0;
+      for (const a of myDayActions) {
+        if (a.debt_applied > 0 || a.rule_id === 'adj_weekly') myRunningDebt += a.debt_applied;
+      }
+      for (const a of oppDayActions) {
+        if (a.debt_applied > 0 || a.rule_id === 'adj_weekly') oppRunningDebt += a.debt_applied;
+      }
 
       data.push({
         fullDate: dObj.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -304,24 +311,35 @@ export default function Performance() {
         
         <div style={{ width: '100%', height: 200 }}>
           <ResponsiveContainer>
-            <AreaChart data={chartDataToUse} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorYou" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#34C759" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#34C759" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorOpp" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#0A84FF" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey={xAxisKey} stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={chartMode === 'intraday' ? 'preserveStartEnd' : 0} angle={-45} textAnchor="end" height={40} />
-              <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="You" stroke="#34C759" strokeWidth={3} fillOpacity={1} fill="url(#colorYou)" />
-              <Area type="monotone" dataKey={oppName} stroke="#0A84FF" strokeWidth={3} fillOpacity={1} fill="url(#colorOpp)" />
-            </AreaChart>
+            {chartMode === 'intraday' ? (
+              <AreaChart data={chartDataToUse} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorYou" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#34C759" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#34C759" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorOpp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#0A84FF" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey={xAxisKey} stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={chartMode === 'intraday' ? 'preserveStartEnd' : 0} angle={-45} textAnchor="end" height={40} />
+                <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="You" stroke="#34C759" strokeWidth={3} fillOpacity={1} fill="url(#colorYou)" />
+                <Area type="monotone" dataKey={oppName} stroke="#0A84FF" strokeWidth={3} fillOpacity={1} fill="url(#colorOpp)" />
+              </AreaChart>
+            ) : (
+              <BarChart data={chartDataToUse} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey={xAxisKey} stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
+                <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                <Bar dataKey="You" fill="#34C759" radius={[4, 4, 0, 0]} />
+                <Bar dataKey={oppName} fill="#0A84FF" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
