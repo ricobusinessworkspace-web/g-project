@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Undo2 } from 'lucide-react';
+import { Undo2, ChevronDown, ChevronUp } from 'lucide-react';
 import ActionCard from '../components/ActionCard';
 import { useTrackerStore, getGmDate } from '../store/trackerStore';
 
@@ -8,11 +8,13 @@ export default function Dashboard() {
   const { 
     myPoints, myWeeklyDebt, opponentPoints, opponentName, rules, 
     logAction, undoAction, logGm, lastGmDate, isLoading, opponentIsOnline,
-    opponentLastSettlementDate, userName, userId, actionEntries, opponentActionEntries, opponentLastGmDate
+    opponentLastSettlementDate, userName, userId, actionEntries, opponentActionEntries, opponentLastGmDate,
+    lastWeeklyResetDate
   } = useTrackerStore();
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [inputValue, setInputValue] = useState('');
+  const [showDebtDropdown, setShowDebtDropdown] = useState(false);
   const [pullY, setPullY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -117,6 +119,12 @@ export default function Dashboard() {
     .filter(a => a.timestamp >= startOfDay && a.timestamp < endOfDay && !a.is_cancelled);
 
   const combinedHistory = [...myTodayActions, ...oppTodayActions].sort((a, b) => b.timestamp - a.timestamp);
+
+  const resetTimestamp = lastWeeklyResetDate ? new Date(lastWeeklyResetDate).getTime() : 0;
+  const weeklyDebtBreakdown = actionEntries
+    .filter(a => !a.is_cancelled && a.timestamp > resetTimestamp && a.debt_applied !== 0)
+    .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   const groupedHistory: any[] = [];
   for (const entry of combinedHistory) {
@@ -239,8 +247,42 @@ export default function Dashboard() {
         </div>
         
         {myWeeklyDebt > 0 && (
-          <div style={{ color: 'var(--error-color)', fontSize: '1.2rem', fontWeight: '700', marginTop: '16px' }}>
-            {myWeeklyDebt}€ Weekly Debt
+          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div 
+              onClick={() => setShowDebtDropdown(!showDebtDropdown)}
+              style={{ color: 'var(--error-color)', fontSize: '1.2rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            >
+              {myWeeklyDebt}€ Weekly Debt
+              {showDebtDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </div>
+            {showDebtDropdown && (
+              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', padding: '16px', marginTop: '12px', width: '240px', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Debt Breakdown</div>
+                {weeklyDebtBreakdown.length === 0 ? (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No actions recorded.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {weeklyDebtBreakdown.map(entry => {
+                      const rule = rules.find(r => r.id === entry.rule_id);
+                      let name = rule ? rule.name : entry.rule_id;
+                      if (entry.rule_id === 'daily_debt_settlement') name = 'Daily Tax';
+                      if (entry.rule_id === 'adj_weekly') name = 'Adjustment';
+                      if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
+                      
+                      const sign = entry.debt_applied > 0 ? '+' : '';
+                      return (
+                        <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{name}</span>
+                          <span style={{ fontSize: '0.9rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
+                            {sign}{entry.debt_applied}€
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
