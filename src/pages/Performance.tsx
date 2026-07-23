@@ -129,51 +129,45 @@ export default function Performance() {
     return data;
   }, [actionEntries, opponentActionEntries, now, oppName, userId]);
 
+  const weeklyDebtChartData = useMemo(() => {
+    const data = [];
+    const dCopy = new Date(now);
+    const day = dCopy.getDay();
+    const diff = dCopy.getDate() - day + (day === 0 ? -6 : 1);
+    const recentMonday = new Date(dCopy.setDate(diff)).setHours(0, 0, 0, 0);
+
+    let myRunningDebt = 0;
+    let oppRunningDebt = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const start = recentMonday + i * 86400000;
+      const end = start + 86400000;
+      const dObj = new Date(start);
+
+      if (start > now.getTime()) {
+        data.push({ fullDate: dObj.toLocaleDateString('en-US', { weekday: 'short' }) });
+        continue;
+      }
+
+      const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee');
+      const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee');
+
+      for (const a of myDayActions) myRunningDebt += a.debt_applied || 0;
+      for (const a of oppDayActions) oppRunningDebt += a.debt_applied || 0;
+
+      data.push({
+        fullDate: dObj.toLocaleDateString('en-US', { weekday: 'short' }),
+        myDebt: myRunningDebt,
+        oppDebt: oppRunningDebt
+      });
+    }
+    return data;
+  }, [actionEntries, opponentActionEntries, now]);
+
   const chartDataToUse = chartMode === 'intraday' ? intradayData : dailyChartData;
   const xAxisKey = chartMode === 'intraday' ? 'time' : 'fullDate';
 
-  // 2. Data Preparation: Top / Flop Rules (Last 14 days)
-  const ruleStats = useMemo(() => {
-    const counts: Record<string, { positive: number, negative: number, debt: number, totalUses: number }> = {};
-    const fourteenDaysAgo = startOfToday - 13 * 86400000;
-    
-    const validActions = actionEntries.filter(a => a.timestamp >= fourteenDaysAgo && !a.is_cancelled);
-    for (const a of validActions) {
-      if (!counts[a.rule_id]) counts[a.rule_id] = { positive: 0, negative: 0, debt: 0, totalUses: 0 };
-      counts[a.rule_id].totalUses += 1;
-      if (a.points_applied > 0) counts[a.rule_id].positive += a.points_applied;
-      if (a.points_applied < 0) counts[a.rule_id].negative += Math.abs(a.points_applied);
-      if (a.debt_applied > 0) counts[a.rule_id].debt += a.debt_applied;
-    }
-    return counts;
-  }, [actionEntries, startOfToday]);
 
-  const topPositiveRule = useMemo(() => {
-    let topId = null;
-    let max = 0;
-    Object.keys(ruleStats).forEach(id => {
-      if (ruleStats[id].positive > max && id !== 'gm_1' && id !== 'mandatory_penalty') {
-        max = ruleStats[id].positive;
-        topId = id;
-      }
-    });
-    return topId ? rules.find(r => r.id === topId) : null;
-  }, [ruleStats, rules]);
-
-  const topNegativeRule = useMemo(() => {
-    let topId = null;
-    let max = 0;
-    Object.keys(ruleStats).forEach(id => {
-      if (ruleStats[id].negative > max || ruleStats[id].debt < 0) {
-        const score = ruleStats[id].negative + Math.abs(Math.min(ruleStats[id].debt, 0));
-        if (score > max) {
-          max = score;
-          topId = id;
-        }
-      }
-    });
-    return topId ? rules.find(r => r.id === topId) : null;
-  }, [ruleStats, rules]);
 
   // 3. Past Days History Component
   const [expandedDate, setExpandedDate] = useState<number | null>(null);
@@ -190,38 +184,61 @@ export default function Performance() {
     const start = dateTimestamp;
     const end = new Date(new Date(start).getFullYear(), new Date(start).getMonth(), new Date(start).getDate() + 1).getTime();
     
-    const myDay = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled).map(a => ({...a, isMe: true}));
-    const oppDay = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled).map(a => ({...a, isMe: false}));
-    const combined = [...myDay, ...oppDay].sort((a, b) => b.timestamp - a.timestamp);
+    const myDay = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
+    const oppDay = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
     
-    if (combined.length === 0) return <div style={{ padding: '16px', color: 'var(--text-secondary)', textAlign: 'center', fontSize: '0.9rem' }}>No activity</div>;
-    
+    const dayData = dailyChartData.find((d: any) => d.dateValue === start);
+    const myFinalPoints = dayData ? dayData.You : '-';
+    const oppFinalPoints = dayData ? dayData[oppName] : '-';
+
+    const renderActionList = (actions: any[]) => {
+      if (actions.length === 0) return <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', padding: '8px 0' }}>No actions</div>;
+      return actions.map(entry => {
+        const rule = rules.find(r => r.id === entry.rule_id);
+        let ruleName = rule ? rule.name : 'Unknown';
+        if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
+        if (entry.rule_id === 'daily_debt_settlement') ruleName = 'Daily Debt Added';
+        if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
+        if (entry.rule_id === 'late_fee') ruleName = 'Late Fee (Unpaid Debt)';
+        if (entry.rule_id?.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
+        
+        let ptColor = entry.points_applied > 0 ? 'var(--error-color)' : entry.points_applied < 0 ? 'var(--accent-color)' : 'var(--text-secondary)';
+        let ptSign = entry.points_applied > 0 ? '+' : '';
+        
+        return (
+          <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '8px' }}>{ruleName}</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: ptColor }}>
+              {entry.points_applied !== 0 ? `${ptSign}${entry.points_applied}` : ''}
+            </span>
+          </div>
+        );
+      });
+    };
+
     return (
-      <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {combined.map(entry => {
-          const rule = rules.find(r => r.id === entry.rule_id);
-          let ruleName = rule ? rule.name : 'Unknown';
-          if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
-          if (entry.rule_id === 'daily_debt_settlement') ruleName = 'Daily Debt Added';
-          if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
-          if (entry.rule_id === 'late_fee') ruleName = 'Late Fee (Unpaid Debt)';
-          if (entry.rule_id?.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
-          
-          let ptColor = entry.points_applied > 0 ? 'var(--error-color)' : entry.points_applied < 0 ? 'var(--accent-color)' : 'var(--text-secondary)';
-          let ptSign = entry.points_applied > 0 ? '+' : '';
-          
-          return (
-            <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: entry.isMe ? 'var(--accent-color)' : 'var(--text-secondary)' }}>{entry.isMe ? 'YOU' : oppName.substring(0, 2).toUpperCase()}</span>
-                <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{ruleName}</span>
-              </div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: ptColor }}>
-                {entry.points_applied !== 0 ? `${ptSign}${entry.points_applied}` : ''}
-              </div>
+      <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          {/* You Column */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>You</div>
+            <div style={{ flex: 1 }}>{renderActionList(myDay)}</div>
+            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '8px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>FINAL</span>
+              <span style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text-primary)' }}>{myFinalPoints}</span>
             </div>
-          );
-        })}
+          </div>
+
+          {/* Opponent Column */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>{oppName}</div>
+            <div style={{ flex: 1 }}>{renderActionList(oppDay)}</div>
+            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '8px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>FINAL</span>
+              <span style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text-primary)' }}>{oppFinalPoints}</span>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -302,8 +319,8 @@ export default function Performance() {
               <XAxis dataKey={xAxisKey} stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={chartMode === 'intraday' ? 'preserveStartEnd' : 0} angle={-45} textAnchor="end" height={40} />
               <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type={chartMode === 'intraday' ? 'stepAfter' : 'monotone'} dataKey="You" stroke="#34C759" strokeWidth={3} fillOpacity={1} fill="url(#colorYou)" />
-              <Area type={chartMode === 'intraday' ? 'stepAfter' : 'monotone'} dataKey={oppName} stroke="#0A84FF" strokeWidth={3} fillOpacity={1} fill="url(#colorOpp)" />
+              <Area type="monotone" dataKey="You" stroke="#34C759" strokeWidth={3} fillOpacity={1} fill="url(#colorYou)" />
+              <Area type="monotone" dataKey={oppName} stroke="#0A84FF" strokeWidth={3} fillOpacity={1} fill="url(#colorOpp)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -311,10 +328,10 @@ export default function Performance() {
 
       {/* Debt Chart */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '24px', padding: '20px 10px', marginBottom: '30px' }}>
-        <h3 style={{ marginLeft: '10px', marginBottom: '20px', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Debt Activity</h3>
+        <h3 style={{ marginLeft: '10px', marginBottom: '20px', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Debt Activity (This Week)</h3>
         <div style={{ width: '100%', height: 200 }}>
           <ResponsiveContainer>
-            <AreaChart data={dailyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={weeklyDebtChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorMyDebt" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#FF3B30" stopOpacity={0.3}/>
@@ -336,54 +353,7 @@ export default function Performance() {
         </div>
       </div>
 
-      {/* Rule Insights */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
-            Worst Penalties
-          </div>
-          <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--error-color)' }}>
-            {topPositiveRule ? topPositiveRule.name : 'None'}
-          </div>
-        </div>
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
-            Best Helpers
-          </div>
-          <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-color)' }}>
-            {topNegativeRule ? topNegativeRule.name : 'None'}
-          </div>
-        </div>
-      </div>
 
-      {/* Daily Summary Table */}
-      <div style={{ marginBottom: '40px' }}>
-        <h3 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Daily Summary</h3>
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                <th style={{ padding: '12px 16px', fontWeight: 'bold' }}>Date</th>
-                <th style={{ padding: '12px 16px', fontWeight: 'bold' }}>Earned</th>
-                <th style={{ padding: '12px 16px', fontWeight: 'bold' }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...dailyChartData].reverse().map((day: any) => {
-                const earnedColor = day.myDayEarned > 5 ? 'var(--error-color)' : day.myDayEarned < 5 ? 'var(--accent-color)' : 'var(--text-primary)';
-                const sign = day.myDayEarned > 0 ? '+' : '';
-                return (
-                  <tr key={day.dateValue} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>{day.fullDate}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', color: earnedColor, fontWeight: 'bold' }}>{sign}{day.myDayEarned}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{day.You}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* Past Days History */}
       <div style={{ marginBottom: '20px' }}>
