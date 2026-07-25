@@ -6,10 +6,32 @@ import { useTrackerStore, getGmDate } from '../store/trackerStore';
 
 export default function Dashboard() {
   const { 
-    myPoints, myWeeklyDebt, opponentPoints, opponentName, rules, 
-    logAction, undoAction, logGm, lastGmDate, isLoading, opponentIsOnline,
-    opponentLastSettlementDate, userName, userId, actionEntries, opponentActionEntries, opponentLastGmDate,
-    lastWeeklyResetDate
+    myPoints, 
+    myWeeklyDebt, 
+    opponentPoints, 
+    opponentName, 
+    rules, 
+    logAction, 
+    undoAction, 
+    logGm, 
+    lastGmDate, 
+    isLoading, 
+    opponentIsOnline,
+    opponentLastSettlementDate, 
+    userName, 
+    userId, 
+    actionEntries, 
+    opponentActionEntries, 
+    opponentLastGmDate,
+    lastWeeklyResetDate,
+    opponentFamilyTrip,
+    myFamilyTrip,
+    myTripAbroad,
+    opponentTripAbroad,
+    mySicko,
+    opponentSicko,
+    myGoofFreeDayUsed,
+    opponentGoofFreeDayUsed
   } = useTrackerStore();
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
@@ -77,14 +99,14 @@ export default function Dashboard() {
   // Determine sleep tax preview for YOU
   let currentSleepTax = 0;
   const currentHours = now.getHours();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const hasNoSleepRule = actionEntries.some(a => 
-    a.timestamp >= todayStart && 
-    !a.is_cancelled && 
-    rules.find(r => r.id === a.rule_id)?.name.toLowerCase().includes('no sleep')
-  );
+  const currentSimDate = new Date().toISOString().split('T')[0];
+  const isExemptFromSleep = 
+    myFamilyTrip || opponentFamilyTrip || 
+    myTripAbroad || opponentTripAbroad || 
+    mySicko || opponentSicko || 
+    myGoofFreeDayUsed === currentSimDate || opponentGoofFreeDayUsed === currentSimDate;
   
-  if (!isFamilyTrip && !hasNoSleepRule) {
+  if (!isExemptFromSleep) {
     if (currentHours >= 5) currentSleepTax += 10;
     if (currentHours >= 6) currentSleepTax += 5;
     if (currentHours >= 7) currentSleepTax += 5;
