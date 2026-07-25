@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { useTrackerStore, getLogicalDate, getISODate } from '../store/trackerStore';
 import { Pencil, ShieldCheck } from 'lucide-react';
 import { supabase } from '../utils/supabase';
@@ -28,6 +29,38 @@ export default function SettingsPage() {
   const todayGmAction = actionEntries.find(a => !a.is_cancelled && a.rule_id === 'gm_1' && getLogicalDate(new Date(a.timestamp)) === currentSimDate);
   const todayGmTimeStr = todayGmAction ? new Date(todayGmAction.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
   const displayGmTime = localGmTime !== null ? localGmTime : todayGmTimeStr;
+
+  const handleSaveGmTime = () => {
+    if (!localGmTime || localGmTime === todayGmTimeStr) {
+      setIsAdjustingGm(false);
+      return;
+    }
+    const [h, m] = localGmTime.split(':');
+    if (!h || !m) return;
+    
+    const newDate = new Date();
+    newDate.setHours(parseInt(h, 10));
+    newDate.setMinutes(parseInt(m, 10));
+    newDate.setSeconds(0);
+    newDate.setMilliseconds(0);
+    
+    if (newDate < new Date()) {
+      toast.error('GM-Zeit darf nicht in der Vergangenheit liegen!', { style: { borderRadius: '12px', background: '#333', color: '#fff' } });
+      setLocalGmTime(null);
+      setIsAdjustingGm(false);
+      return;
+    }
+
+    if (todayGmTimeStr) {
+      updateGm(newDate, currentSimDate);
+    } else {
+      logGm(newDate, currentSimDate);
+    }
+    
+    setLocalGmTime(null);
+    setIsAdjustingGm(false);
+    toast.success('GM Zeit aktualisiert', { style: { borderRadius: '12px', background: '#333', color: '#fff' } });
+  };
 
   const openEditModal = (type: 'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS', currentValue: string | number) => {
     setEditType(type);
@@ -202,53 +235,46 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 ) : (
-                  <input 
-                    type="time" 
-                    className="time-input"
-                    style={{ 
-                      background: 'var(--card-border)', 
-                      color: 'white', 
-                      padding: '6px 10px', 
-                      borderRadius: '8px', 
-                      border: 'none',
-                      fontSize: '0.9rem',
-                      fontFamily: 'inherit'
-                    }}
-                    value={displayGmTime}
-                    onChange={(e) => {
-                      setLocalGmTime(e.target.value);
-                    }}
-                    onBlur={() => {
-                      if (!localGmTime || localGmTime === todayGmTimeStr) {
-                        setIsAdjustingGm(false);
-                        return;
-                      }
-                      const [h, m] = localGmTime.split(':');
-                      if (!h || !m) return;
-                      
-                      const newDate = new Date();
-                      newDate.setHours(parseInt(h, 10));
-                      newDate.setMinutes(parseInt(m, 10));
-                      newDate.setSeconds(0);
-                      newDate.setMilliseconds(0);
-                      
-                      if (newDate < new Date()) {
-                        toast.error('GM-Zeit darf nicht in der Vergangenheit liegen!', { style: { borderRadius: '12px', background: '#333', color: '#fff' } });
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input 
+                      type="time" 
+                      className="time-input"
+                      style={{ 
+                        background: 'var(--card-border)', 
+                        color: 'white', 
+                        padding: '6px 10px', 
+                        borderRadius: '8px', 
+                        border: 'none',
+                        fontSize: '0.9rem',
+                        fontFamily: 'inherit'
+                      }}
+                      value={displayGmTime}
+                      onChange={(e) => {
+                        setLocalGmTime(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSaveGmTime();
+                        }
+                      }}
+                    />
+                    <button 
+                      onClick={handleSaveGmTime}
+                      style={{ background: 'var(--success-color, #4ade80)', color: '#1a1a1a', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                    >
+                      Speichern
+                    </button>
+                    <button 
+                      onClick={() => {
                         setLocalGmTime(null);
                         setIsAdjustingGm(false);
-                        return;
-                      }
-
-                      if (todayGmTimeStr) {
-                        updateGm(newDate, currentSimDate);
-                      } else {
-                        logGm(newDate, currentSimDate);
-                      }
-                      
-                      setLocalGmTime(null);
-                      setIsAdjustingGm(false);
-                    }}
-                  />
+                      }}
+                      style={{ background: 'transparent', color: 'var(--text-color)', border: '1px solid var(--card-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem' }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -331,6 +357,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      <Toaster position="bottom-center" />
     </div>
   );
 }
