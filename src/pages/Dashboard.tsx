@@ -44,7 +44,7 @@ export default function Dashboard() {
 
   const now = new Date();
   const todayStr = getLogicalDate(now);
-  const needsGm = lastGmDate !== todayStr;
+  const needsGm = lastGmDate !== todayStr && now.getHours() >= 4;
 
   if (isLoading) {
     return (
