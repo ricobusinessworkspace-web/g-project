@@ -632,6 +632,11 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const state = get();
     if (!state.userId) return;
 
+    if (rule.id === 'gm_1') {
+      await get().logGm(new Date());
+      return;
+    }
+
     await get().checkAndRunSettlement();
 
     let pointsToApply = 0;
