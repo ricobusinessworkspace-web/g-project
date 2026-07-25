@@ -547,13 +547,13 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     await runCatchUpEngine(state, set);
   },
 
-  logGm: async (wakeTime: Date) => {
+  logGm: async (wakeTime: Date, forcedLogicalDay?: string) => {
     const state = get();
     if (!state.userId) return;
     
     await get().checkAndRunSettlement();
 
-    const todayStr = getGmDate(wakeTime); 
+    const todayStr = forcedLogicalDay || getGmDate(wakeTime); 
 
     let sleepTax = 0; // Pure sleep penalty on top of base 5
     const hours = wakeTime.getHours();
@@ -622,10 +622,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     });
   },
 
-  updateGm: async (wakeTime: Date) => {
-      const todayStr = getGmDate(wakeTime);
+  updateGm: async (wakeTime: Date, forcedLogicalDay?: string) => {
+      const todayStr = forcedLogicalDay || getGmDate(wakeTime);
       await get().undoAction('gm_' + todayStr);
-      await get().logGm(wakeTime);
+      await get().logGm(wakeTime, todayStr);
   },
 
   logAction: async (rule, multiplier = 1) => {

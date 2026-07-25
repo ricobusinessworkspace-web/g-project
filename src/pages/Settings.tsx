@@ -211,9 +211,9 @@ export default function SettingsPage() {
                   newDate.setMilliseconds(0);
                   
                   if (todayGmTimeStr) {
-                    updateGm(newDate);
+                    updateGm(newDate, currentSimDate);
                   } else {
-                    logGm(newDate);
+                    logGm(newDate, currentSimDate);
                   }
                 }}
               />
