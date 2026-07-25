@@ -578,14 +578,16 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     // We store the full points (base 5 + tax) in the action so history displays correctly.
     // However, catchUpEngine already gave us 5 points, so we only ADD the sleepTax to myPoints.
     const totalGmPoints = 5 + sleepTax;
+    const gmActionId = 'gm_' + todayStr;
     
-    await supabase.from('tracker_action_entries').insert({
-      id: Math.random().toString(),
+    await supabase.from('tracker_action_entries').upsert({
+      id: gmActionId,
       user_id: state.userId,
       rule_id: 'gm_1', // Using generic gm_1 ID
       timestamp: timestamp,
       points_applied: totalGmPoints,
       debt_applied: 0,
+      is_cancelled: false
     });
 
     const newPoints = get().myPoints + sleepTax; 
@@ -596,19 +598,27 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     }).eq('user_id', state.userId);
     if (updateErr) alert('GM Update Error: ' + updateErr.message);
 
+    const newAction = {
+      id: gmActionId,
+      rule_id: 'gm_1',
+      timestamp: timestamp,
+      points_applied: totalGmPoints,
+      debt_applied: 0,
+      is_cancelled: false
+    };
+
+    const existingIndex = get().actionEntries.findIndex(a => a.id === gmActionId);
+    let newEntries = [...get().actionEntries];
+    if (existingIndex >= 0) {
+      newEntries[existingIndex] = newAction;
+    } else {
+      newEntries.push(newAction);
+    }
+
     set({
       myPoints: newPoints,
       lastGmDate: todayStr,
-      actionEntries: [
-        ...get().actionEntries,
-        {
-          id: 'gm_' + todayStr,
-          rule_id: 'gm_1',
-          timestamp: timestamp,
-          points_applied: totalGmPoints,
-          debt_applied: 0,
-        }
-      ]
+      actionEntries: newEntries
     });
   },
 
