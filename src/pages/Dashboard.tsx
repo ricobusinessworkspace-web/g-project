@@ -133,7 +133,13 @@ export default function Dashboard() {
   let currentMyPoints = myPoints;
   const myAnnotatedActions = allMyActionsDesc.map(a => {
     const pointsAtThisTime = currentMyPoints;
-    if (!a.is_cancelled) currentMyPoints -= a.points_applied;
+    if (!a.is_cancelled) {
+      if (a.rule_id && a.rule_id.startsWith('gm_')) {
+        currentMyPoints -= Math.max(0, a.points_applied - 5);
+      } else {
+        currentMyPoints -= a.points_applied;
+      }
+    }
     return { ...a, isMe: true, runningPoints: pointsAtThisTime };
   });
 
@@ -144,7 +150,13 @@ export default function Dashboard() {
   let currentOppPoints = opponentPoints;
   const oppAnnotatedActions = allOppActionsDesc.map(a => {
     const pointsAtThisTime = currentOppPoints;
-    if (!a.is_cancelled) currentOppPoints -= a.points_applied;
+    if (!a.is_cancelled) {
+      if (a.rule_id && a.rule_id.startsWith('gm_')) {
+        currentOppPoints -= Math.max(0, a.points_applied - 5);
+      } else {
+        currentOppPoints -= a.points_applied;
+      }
+    }
     return { ...a, isMe: false, runningPoints: pointsAtThisTime };
   });
 
