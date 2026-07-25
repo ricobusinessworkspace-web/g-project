@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTrackerStore, getGmDate, getISODate } from '../store/trackerStore';
+import { useTrackerStore, getLogicalDate, getISODate } from '../store/trackerStore';
 import { Pencil, ShieldCheck } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
@@ -21,10 +21,11 @@ export default function SettingsPage() {
   const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS'>('TOTAL');
   const [editValue, setEditValue] = useState('');
   const [localGmTime, setLocalGmTime] = useState<string | null>(null);
+  const [isAdjustingGm, setIsAdjustingGm] = useState(false);
 
   const now = new Date();
-  const currentSimDate = getGmDate(now);
-  const todayGmAction = actionEntries.find(a => !a.is_cancelled && a.rule_id === 'gm_1' && getGmDate(new Date(a.timestamp)) === currentSimDate);
+  const currentSimDate = getLogicalDate(now);
+  const todayGmAction = actionEntries.find(a => !a.is_cancelled && a.rule_id === 'gm_1' && getLogicalDate(new Date(a.timestamp)) === currentSimDate);
   const todayGmTimeStr = todayGmAction ? new Date(todayGmAction.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
   const displayGmTime = localGmTime !== null ? localGmTime : todayGmTimeStr;
 
@@ -187,44 +188,69 @@ export default function SettingsPage() {
             </div>
           </div>
           {lastGmDate === currentSimDate && (
-            <div className="card-row">
-              <span className="card-row-label">Today's GM Time</span>
-              <input 
-                type="time" 
-                className="time-input"
-                style={{ 
-                  background: 'var(--card-border)', 
-                  color: 'white', 
-                  padding: '6px 10px', 
-                  borderRadius: '8px', 
-                  border: 'none',
-                  fontSize: '0.9rem',
-                  fontFamily: 'inherit'
-                }}
-                value={displayGmTime}
-                onChange={(e) => {
-                  setLocalGmTime(e.target.value);
-                }}
-                onBlur={() => {
-                  if (!localGmTime || localGmTime === todayGmTimeStr) return;
-                  const [h, m] = localGmTime.split(':');
-                  if (!h || !m) return;
-                  
-                  const newDate = new Date();
-                  newDate.setHours(parseInt(h, 10));
-                  newDate.setMinutes(parseInt(m, 10));
-                  newDate.setSeconds(0);
-                  newDate.setMilliseconds(0);
-                  
-                  if (todayGmTimeStr) {
-                    updateGm(newDate, currentSimDate);
-                  } else {
-                    logGm(newDate, currentSimDate);
-                  }
-                  
-                  setLocalGmTime(null);
-                }}
-              />
+            <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                <span className="card-row-label">Today's GM Time</span>
+                {!isAdjustingGm ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="card-row-value">{todayGmTimeStr}</span>
+                    <button 
+                      onClick={() => setIsAdjustingGm(true)}
+                      style={{ background: 'var(--primary-color)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                    >
+                      Anpassen
+                    </button>
+                  </div>
+                ) : (
+                  <input 
+                    type="time" 
+                    className="time-input"
+                    style={{ 
+                      background: 'var(--card-border)', 
+                      color: 'white', 
+                      padding: '6px 10px', 
+                      borderRadius: '8px', 
+                      border: 'none',
+                      fontSize: '0.9rem',
+                      fontFamily: 'inherit'
+                    }}
+                    value={displayGmTime}
+                    onChange={(e) => {
+                      setLocalGmTime(e.target.value);
+                    }}
+                    onBlur={() => {
+                      if (!localGmTime || localGmTime === todayGmTimeStr) {
+                        setIsAdjustingGm(false);
+                        return;
+                      }
+                      const [h, m] = localGmTime.split(':');
+                      if (!h || !m) return;
+                      
+                      const newDate = new Date();
+                      newDate.setHours(parseInt(h, 10));
+                      newDate.setMinutes(parseInt(m, 10));
+                      newDate.setSeconds(0);
+                      newDate.setMilliseconds(0);
+                      
+                      if (newDate < new Date()) {
+                        toast.error('GM-Zeit darf nicht in der Vergangenheit liegen!', { style: { borderRadius: '12px', background: '#333', color: '#fff' } });
+                        setLocalGmTime(null);
+                        setIsAdjustingGm(false);
+                        return;
+                      }
+
+                      if (todayGmTimeStr) {
+                        updateGm(newDate, currentSimDate);
+                      } else {
+                        logGm(newDate, currentSimDate);
+                      }
+                      
+                      setLocalGmTime(null);
+                      setIsAdjustingGm(false);
+                    }}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>

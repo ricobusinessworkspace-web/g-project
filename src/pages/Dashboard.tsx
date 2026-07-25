@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { Undo2, ChevronDown, ChevronUp } from 'lucide-react';
 import ActionCard from '../components/ActionCard';
-import { useTrackerStore, getGmDate, getISODate } from '../store/trackerStore';
+import { useTrackerStore, getLogicalDate, getISODate } from '../store/trackerStore';
 
 export default function Dashboard() {
   const { 
@@ -43,7 +43,7 @@ export default function Dashboard() {
   const [startY, setStartY] = useState(0);
 
   const now = new Date();
-  const todayStr = getGmDate(now);
+  const todayStr = getLogicalDate(now);
   const needsGm = lastGmDate !== todayStr;
 
   if (isLoading) {

@@ -40,14 +40,7 @@ export const getISODate = (date: Date) => {
 };
 
 export const getLogicalDate = (date: Date) => {
-  // Points boundary is 0:00 (Midnight)
   return getISODate(date);
-};
-
-export const getGmDate = (date: Date) => {
-  // GM boundary is 4:00 AM
-  const logicalNow = new Date(date.getTime() - 4 * 60 * 60 * 1000);
-  return getISODate(logicalNow);
 };
 
 export const getRuleUsageStats = (entries: ActionEntry[], rule: Rule) => {
@@ -553,7 +546,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     
     await get().checkAndRunSettlement();
 
-    const todayStr = forcedLogicalDay || getGmDate(wakeTime); 
+    const todayStr = forcedLogicalDay || getLogicalDate(wakeTime); 
 
     let sleepTax = 0; // Pure sleep penalty on top of base 5
     const hours = wakeTime.getHours();
@@ -623,7 +616,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   },
 
   updateGm: async (wakeTime: Date, forcedLogicalDay?: string) => {
-      const todayStr = forcedLogicalDay || getGmDate(wakeTime);
+      const todayStr = forcedLogicalDay || getLogicalDate(wakeTime);
       await get().undoAction('gm_' + todayStr);
       await get().logGm(wakeTime, todayStr);
   },
