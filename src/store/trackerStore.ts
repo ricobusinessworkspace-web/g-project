@@ -567,7 +567,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       state.myGoofFreeDayUsed === currentSimDate || state.opponentGoofFreeDayUsed === currentSimDate;
     
     if (!isExempt) {
-      if (hours >= 5) sleepTax += 10; // sleepy after 4:59
+      if (hours >= 5) sleepTax += 5; // sleepy after 4:59
       if (hours >= 6) sleepTax += 5;  // every hour...
       if (hours >= 7) sleepTax += 5;
       if (hours >= 8) sleepTax += 5;  // ...until 8:00
@@ -575,12 +575,16 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const timestamp = wakeTime.getTime();
     
+    // We store the full points (base 5 + tax) in the action so history displays correctly.
+    // However, catchUpEngine already gave us 5 points, so we only ADD the sleepTax to myPoints.
+    const totalGmPoints = 5 + sleepTax;
+    
     await supabase.from('tracker_action_entries').insert({
       id: Math.random().toString(),
       user_id: state.userId,
       rule_id: 'gm_1', // Using generic gm_1 ID
       timestamp: timestamp,
-      points_applied: sleepTax,
+      points_applied: totalGmPoints,
       debt_applied: 0,
     });
 
@@ -601,7 +605,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
           id: 'gm_' + todayStr,
           rule_id: 'gm_1',
           timestamp: timestamp,
-          points_applied: sleepTax,
+          points_applied: totalGmPoints,
           debt_applied: 0,
         }
       ]
@@ -746,8 +750,11 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       newWeeklyDebt -= entry.debt_applied;
     }
 
+    const isGm = entry.rule_id?.startsWith('gm_');
+    const pointsToSubtract = isGm ? entry.points_applied - 5 : entry.points_applied;
+
     set({
-      myPoints: get().myPoints - entry.points_applied,
+      myPoints: get().myPoints - pointsToSubtract,
       myDebt: get().myDebt - entry.debt_applied,
       myWeeklyDebt: newWeeklyDebt,
       myTotalDebt: newTotalDebt,

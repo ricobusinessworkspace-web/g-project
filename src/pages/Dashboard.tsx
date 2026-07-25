@@ -107,7 +107,7 @@ export default function Dashboard() {
     myGoofFreeDayUsed === currentSimDate || opponentGoofFreeDayUsed === currentSimDate;
   
   if (!isExemptFromSleep) {
-    if (currentHours >= 5) currentSleepTax += 10;
+    if (currentHours >= 5) currentSleepTax += 5;
     if (currentHours >= 6) currentSleepTax += 5;
     if (currentHours >= 7) currentSleepTax += 5;
     if (currentHours >= 8) currentSleepTax += 5;
@@ -352,7 +352,7 @@ export default function Dashboard() {
               if (entry.rule_id === 'adj_points') ruleName = 'Points Adjust';
               if (entry.rule_id === 'late_fee') ruleName = 'Late Fee (Unpaid Debt)';
               if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
-              if (entry.rule_id?.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
+              if (entry.rule_id?.startsWith('gm_')) ruleName = 'GM';
               if (entry.rule_id === 'daily_debt_settlement') ruleName = 'Daily Debt Added';
               
               const displayName = entry.groupedCount > 1 ? `${entry.groupedCount}x ${ruleName}` : ruleName;
