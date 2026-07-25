@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { Undo2, ChevronDown, ChevronUp } from 'lucide-react';
 import ActionCard from '../components/ActionCard';
-import { useTrackerStore, getGmDate } from '../store/trackerStore';
+import { useTrackerStore, getGmDate, getISODate } from '../store/trackerStore';
 
 export default function Dashboard() {
   const { 
@@ -99,7 +99,7 @@ export default function Dashboard() {
   // Determine sleep tax preview for YOU
   let currentSleepTax = 0;
   const currentHours = now.getHours();
-  const currentSimDate = new Date().toISOString().split('T')[0];
+  const currentSimDate = getISODate(now);
   const isExemptFromSleep = 
     myFamilyTrip || opponentFamilyTrip || 
     myTripAbroad || opponentTripAbroad || 

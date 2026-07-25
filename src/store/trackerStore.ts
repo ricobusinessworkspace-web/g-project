@@ -559,7 +559,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const hours = wakeTime.getHours();
     
     // Equal taxation for Exemptions -> No sleep rules
-    const currentSimDate = new Date().toISOString().split('T')[0];
+    const currentSimDate = getISODate(new Date());
     const isExempt = 
       state.myFamilyTrip || state.opponentFamilyTrip ||
       state.myTripAbroad || state.opponentTripAbroad ||

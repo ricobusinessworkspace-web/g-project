@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTrackerStore } from '../store/trackerStore';
+import { useTrackerStore, getGmDate, getISODate } from '../store/trackerStore';
 import { Pencil, ShieldCheck } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
@@ -22,8 +22,8 @@ export default function SettingsPage() {
   const [editValue, setEditValue] = useState('');
 
   const now = new Date();
-  const currentSimDate = new Date(now.getTime() - 4 * 3600000).toISOString().split('T')[0];
-  const todayGmAction = actionEntries.find(a => !a.is_cancelled && a.rule_id === 'gm_1' && new Date(a.timestamp - 4 * 3600000).toISOString().split('T')[0] === currentSimDate);
+  const currentSimDate = getGmDate(now);
+  const todayGmAction = actionEntries.find(a => !a.is_cancelled && a.rule_id === 'gm_1' && getGmDate(new Date(a.timestamp)) === currentSimDate);
   const todayGmTimeStr = todayGmAction ? new Date(todayGmAction.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
 
   const openEditModal = (type: 'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS', currentValue: string | number) => {
@@ -129,13 +129,13 @@ export default function SettingsPage() {
             <button 
               className="modal-btn" 
               style={{ 
-                background: myGoofFreeDayUsed === new Date().toISOString().split('T')[0] ? 'var(--accent-color)' : 'var(--card-border)',
+                background: myGoofFreeDayUsed === getISODate(new Date()) ? 'var(--accent-color)' : 'var(--card-border)',
                 padding: '8px 16px', flex: 'none', color: 'white',
-                opacity: (myGoofFreeDayUsed && myGoofFreeDayUsed !== new Date().toISOString().split('T')[0] && myGoofFreeDayUsed.substring(0, 7) === new Date().toISOString().substring(0, 7)) ? 0.5 : 1,
-                cursor: (myGoofFreeDayUsed && myGoofFreeDayUsed !== new Date().toISOString().split('T')[0] && myGoofFreeDayUsed.substring(0, 7) === new Date().toISOString().substring(0, 7)) ? 'not-allowed' : 'pointer'
+                opacity: (myGoofFreeDayUsed && myGoofFreeDayUsed !== getISODate(new Date()) && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7)) ? 0.5 : 1,
+                cursor: (myGoofFreeDayUsed && myGoofFreeDayUsed !== getISODate(new Date()) && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7)) ? 'not-allowed' : 'pointer'
               }}
               onClick={() => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = getISODate(new Date());
                 const currentMonth = today.substring(0, 7);
                 const usedMonth = myGoofFreeDayUsed ? myGoofFreeDayUsed.substring(0, 7) : null;
                 const isUsedThisMonth = usedMonth === currentMonth && myGoofFreeDayUsed !== today;
@@ -149,9 +149,9 @@ export default function SettingsPage() {
                 }
               }}
             >
-              {myGoofFreeDayUsed === new Date().toISOString().split('T')[0] 
+              {myGoofFreeDayUsed === getISODate(new Date())
                 ? 'Active Today' 
-                : (myGoofFreeDayUsed && myGoofFreeDayUsed.substring(0, 7) === new Date().toISOString().substring(0, 7) 
+                : (myGoofFreeDayUsed && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7) 
                     ? 'Already Used This Month' 
                     : 'Activate for Today')}
             </button>
