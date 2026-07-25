@@ -74,13 +74,23 @@ export default function Dashboard() {
     );
   }
 
+  // Determine sleep tax preview for YOU
   let currentSleepTax = 0;
   const currentHours = now.getHours();
-  if (currentHours >= 5) currentSleepTax += 10;
-  if (currentHours >= 6) currentSleepTax += 5;
-  if (currentHours >= 7) currentSleepTax += 5;
-  if (currentHours >= 8) currentSleepTax += 5;
-
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const hasNoSleepRule = actionEntries.some(a => 
+    a.timestamp >= todayStart && 
+    !a.is_cancelled && 
+    rules.find(r => r.id === a.rule_id)?.name.toLowerCase().includes('no sleep')
+  );
+  
+  if (!isFamilyTrip && !hasNoSleepRule) {
+    if (currentHours >= 5) currentSleepTax += 10;
+    if (currentHours >= 6) currentSleepTax += 5;
+    if (currentHours >= 7) currentSleepTax += 5;
+    if (currentHours >= 8) currentSleepTax += 5;
+  }
+  
   const oppName = opponentName || 'Bitch Jigger';
   
   let diffText = "";

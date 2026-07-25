@@ -558,8 +558,16 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     let sleepTax = 0; // Pure sleep penalty on top of base 5
     const hours = wakeTime.getHours();
     
-    // Equal taxation for Family Trip -> No sleep rules
-    const isFamilyTrip = state.myFamilyTrip || state.opponentFamilyTrip;
+    const todayStart = new Date(wakeTime.getFullYear(), wakeTime.getMonth(), wakeTime.getDate()).getTime();
+    const hasNoSleepRule = state.actionEntries.some(a => 
+      a.user_id === state.userId &&
+      a.timestamp >= todayStart && 
+      !a.is_cancelled &&
+      state.rules.find(r => r.id === a.rule_id)?.name.toLowerCase().includes('no sleep')
+    );
+
+    // Equal taxation for Family Trip or No Sleep Rule -> No sleep rules
+    const isFamilyTrip = state.myFamilyTrip || state.opponentFamilyTrip || hasNoSleepRule;
     
     if (!isFamilyTrip) {
       if (hours >= 5) sleepTax += 10; // sleepy after 4:59
