@@ -13,12 +13,18 @@ export default function SettingsPage() {
     myFamilyTrip, setFamilyTrip,
     mySicko, setSicko,
     myGoofFreeDayUsed, setGoofFreeDay,
-    userName, updateName, myPoints, adjustPoints
+    userName, updateName, myPoints, adjustPoints,
+    actionEntries, lastGmDate, updateGm, logGm
   } = useTrackerStore();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS'>('TOTAL');
   const [editValue, setEditValue] = useState('');
+
+  const now = new Date();
+  const currentSimDate = new Date(now.getTime() - 4 * 3600000).toISOString().split('T')[0];
+  const todayGmAction = actionEntries.find(a => !a.is_cancelled && a.rule_id === 'gm_1' && new Date(a.timestamp - 4 * 3600000).toISOString().split('T')[0] === currentSimDate);
+  const todayGmTimeStr = todayGmAction ? new Date(todayGmAction.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
 
   const openEditModal = (type: 'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS', currentValue: string | number) => {
     setEditType(type);
@@ -178,6 +184,41 @@ export default function SettingsPage() {
               <Pencil size={14} color="#8E8E93" />
             </div>
           </div>
+          {lastGmDate === currentSimDate && (
+            <div className="card-row">
+              <span className="card-row-label">Today's GM Time</span>
+              <input 
+                type="time" 
+                className="time-input"
+                style={{ 
+                  background: 'var(--card-border)', 
+                  color: 'white', 
+                  padding: '6px 10px', 
+                  borderRadius: '8px', 
+                  border: 'none',
+                  fontSize: '0.9rem',
+                  fontFamily: 'inherit'
+                }}
+                value={todayGmTimeStr}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!val) return;
+                  const [h, m] = val.split(':');
+                  const newDate = new Date();
+                  newDate.setHours(parseInt(h, 10));
+                  newDate.setMinutes(parseInt(m, 10));
+                  newDate.setSeconds(0);
+                  newDate.setMilliseconds(0);
+                  
+                  if (todayGmTimeStr) {
+                    updateGm(newDate);
+                  } else {
+                    logGm(newDate);
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {myUnpaidWeeklyDebt > 0 && (
