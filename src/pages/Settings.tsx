@@ -20,11 +20,13 @@ export default function SettingsPage() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editType, setEditType] = useState<'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS'>('TOTAL');
   const [editValue, setEditValue] = useState('');
+  const [localGmTime, setLocalGmTime] = useState<string | null>(null);
 
   const now = new Date();
   const currentSimDate = getGmDate(now);
   const todayGmAction = actionEntries.find(a => !a.is_cancelled && a.rule_id === 'gm_1' && getGmDate(new Date(a.timestamp)) === currentSimDate);
   const todayGmTimeStr = todayGmAction ? new Date(todayGmAction.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+  const displayGmTime = localGmTime !== null ? localGmTime : todayGmTimeStr;
 
   const openEditModal = (type: 'WEEKLY' | 'TOTAL' | 'NAME' | 'POINTS', currentValue: string | number) => {
     setEditType(type);
@@ -199,11 +201,15 @@ export default function SettingsPage() {
                   fontSize: '0.9rem',
                   fontFamily: 'inherit'
                 }}
-                value={todayGmTimeStr}
+                value={displayGmTime}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) return;
-                  const [h, m] = val.split(':');
+                  setLocalGmTime(e.target.value);
+                }}
+                onBlur={() => {
+                  if (!localGmTime || localGmTime === todayGmTimeStr) return;
+                  const [h, m] = localGmTime.split(':');
+                  if (!h || !m) return;
+                  
                   const newDate = new Date();
                   newDate.setHours(parseInt(h, 10));
                   newDate.setMinutes(parseInt(m, 10));
@@ -215,6 +221,8 @@ export default function SettingsPage() {
                   } else {
                     logGm(newDate, currentSimDate);
                   }
+                  
+                  setLocalGmTime(null);
                 }}
               />
             </div>
