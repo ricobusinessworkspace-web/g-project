@@ -51,14 +51,22 @@ export default function Performance() {
       let myDayPoints = 5; 
       let myDayDebt = 0;
       for (const a of myDayActions) {
-        myDayPoints += a.points_applied;
+        if (a.rule_id && a.rule_id.startsWith('gm_')) {
+          myDayPoints += Math.max(0, a.points_applied - 5);
+        } else {
+          myDayPoints += a.points_applied;
+        }
         myDayDebt += a.debt_applied;
       }
       
       let oppDayPoints = 5;
       let oppDayDebt = 0;
       for (const a of oppDayActions) {
-        oppDayPoints += a.points_applied;
+        if (a.rule_id && a.rule_id.startsWith('gm_')) {
+          oppDayPoints += Math.max(0, a.points_applied - 5);
+        } else {
+          oppDayPoints += a.points_applied;
+        }
         oppDayDebt += a.debt_applied;
       }
 
