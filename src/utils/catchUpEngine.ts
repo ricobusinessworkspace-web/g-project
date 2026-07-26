@@ -136,7 +136,9 @@ export const runCatchUpEngine = async (state: any, set: any) => {
      if (oppNeedsProcessing && state.opponentUserId && !oppData!.hasDailyDebt) uidsToProcessDailyDebt.push(state.opponentUserId);
 
      if (uidsToProcessDailyDebt.length > 0 && oppData && !ctx[state.userId].isExempt) {
-         let diff = myData.totalPoints - oppData.totalPoints;
+         let myComputed = Math.max(0, myData.totalPoints);
+         let oppComputed = Math.max(0, oppData.totalPoints);
+         let diff = myComputed - oppComputed;
          let debtAmount = 0;
          let absDiff = Math.abs(diff);
          if (absDiff > 0 && absDiff <= 9) debtAmount = 5;
