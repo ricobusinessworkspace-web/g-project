@@ -21,6 +21,12 @@ export default function Performance() {
   const [showMyTotalDebt, setShowMyTotalDebt] = useState(false);
   const [showOppTotalDebt, setShowOppTotalDebt] = useState(false);
 
+  const isTotalDebtRule = (rule_id: string) => {
+    if (rule_id === 'adj_total' || rule_id === 'ab_3') return true;
+    const rule = rules.find(r => r.id === rule_id);
+    return rule?.category === 'ABBAUEN';
+  };
+
   const oppResetTimestamp = opponentLastWeeklyResetDate ? new Date(opponentLastWeeklyResetDate).getTime() : 0;
   const oppWeeklyDebtBreakdown = opponentActionEntries
     .filter(a => !a.is_cancelled && a.timestamp > oppResetTimestamp && a.debt_applied !== 0)
@@ -34,12 +40,6 @@ export default function Performance() {
     .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
     .filter(a => !isTotalDebtRule(a.rule_id))
     .sort((a, b) => b.timestamp - a.timestamp);
-
-  const isTotalDebtRule = (rule_id: string) => {
-    if (rule_id === 'adj_total' || rule_id === 'ab_3') return true;
-    const rule = rules.find(r => r.id === rule_id);
-    return rule?.category === 'ABBAUEN';
-  };
 
   const myTotalDebtBreakdown = actionEntries
     .filter(a => !a.is_cancelled && isTotalDebtRule(a.rule_id))
