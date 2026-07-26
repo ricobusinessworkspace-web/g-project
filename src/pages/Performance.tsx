@@ -7,7 +7,7 @@ export default function Performance() {
   const { 
     myPoints, myTotalDebt, myUnpaidWeeklyDebt, myWeeklyDebt,
     opponentPoints, opponentTotalDebt, opponentUnpaidWeeklyDebt, opponentWeeklyDebt,
-    opponentName, actionEntries, opponentActionEntries, rules, userId 
+    opponentName, actionEntries, opponentActionEntries, rules, userId, opponentUserId, opponentLastWeeklyResetDate
   } = useTrackerStore();
 
   const oppName = opponentName || 'Mate';
@@ -16,6 +16,13 @@ export default function Performance() {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
   const [chartMode, setChartMode] = useState<'intraday' | 'daily'>('daily');
+  const [showOppDebtDropdown, setShowOppDebtDropdown] = useState(false);
+
+  const resetTimestamp = opponentLastWeeklyResetDate ? new Date(opponentLastWeeklyResetDate).getTime() : 0;
+  const oppWeeklyDebtBreakdown = opponentActionEntries
+    .filter(a => !a.is_cancelled && a.timestamp > resetTimestamp && a.debt_applied !== 0)
+    .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   // 1. Data Preparation: Daily Points (Last 14 Days)
   const dailyChartData = useMemo(() => {
@@ -295,6 +302,50 @@ export default function Performance() {
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--error-color)' }}>{myUnpaidWeeklyDebt}€</div>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{oppName}: {opponentUnpaidWeeklyDebt}€</div>
         </div>
+      </div>
+
+      {/* Opponent Debt Breakdown */}
+      <div style={{ marginBottom: '30px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
+        <div 
+          onClick={() => setShowOppDebtDropdown(!showOppDebtDropdown)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <DollarSign size={16} color="var(--error-color)" />
+            <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{oppName}'s Weekly Debt ({opponentWeeklyDebt}€)</span>
+          </div>
+          <div style={{ color: 'var(--text-secondary)' }}>
+            {showOppDebtDropdown ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </div>
+        </div>
+        
+        {showOppDebtDropdown && (
+          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
+            {oppWeeklyDebtBreakdown.length === 0 ? (
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>No actions recorded.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {oppWeeklyDebtBreakdown.map(entry => {
+                  const rule = rules.find(r => r.id === entry.rule_id);
+                  let name = rule ? rule.name : entry.rule_id;
+                  if (entry.rule_id === 'daily_debt_settlement') name = 'Daily Tax';
+                  if (entry.rule_id === 'adj_weekly') name = 'Adjustment';
+                  if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
+                  
+                  const sign = entry.debt_applied > 0 ? '+' : '';
+                  return (
+                    <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{name}</span>
+                      <span style={{ fontSize: '0.9rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
+                        {sign}{entry.debt_applied}€
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Points Chart */}

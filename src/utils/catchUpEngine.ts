@@ -73,7 +73,11 @@ export const runCatchUpEngine = async (state: any, set: any) => {
     if (actions && actions.length > 0) {
        for (const a of actions) {
            if (!a.is_cancelled) {
-               totalPoints += a.points_applied;
+               if (a.rule_id && a.rule_id.startsWith('gm_')) {
+                   totalPoints += Math.max(0, a.points_applied - 5);
+               } else {
+                   totalPoints += a.points_applied;
+               }
                if (a.rule_id === 'daily_debt_settlement') hasDailyDebt = true;
            }
        }
