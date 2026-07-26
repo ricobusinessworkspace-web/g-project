@@ -322,9 +322,10 @@ export default function Dashboard() {
                       if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
                       
                       const sign = entry.debt_applied > 0 ? '+' : '';
+                      const dayStr = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
                       return (
                         <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{name}</span>
+                          <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{dayStr} - {name}</span>
                           <span style={{ fontSize: '0.9rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
                             {sign}{entry.debt_applied}€
                           </span>

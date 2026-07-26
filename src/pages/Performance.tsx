@@ -24,6 +24,14 @@ export default function Performance() {
     .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
     .sort((a, b) => b.timestamp - a.timestamp);
 
+  const totalDebtReductions = useMemo(() => {
+    const cutoff = now.getTime() - 14 * 86400000;
+    const all = [...actionEntries, ...opponentActionEntries];
+    return all
+      .filter(a => !a.is_cancelled && a.timestamp >= cutoff && a.rule_id === 'adj_total')
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [actionEntries, opponentActionEntries, now]);
+
   // 1. Data Preparation: Daily Points (Last 14 Days)
   const dailyChartData = useMemo(() => {
     const data = [];
@@ -196,8 +204,15 @@ export default function Performance() {
   
   const pastDays = useMemo(() => {
     const days = [];
-    for (let i = 1; i <= 7; i++) { // Show last 7 days history
-      days.push(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).getTime());
+    const dCopy = new Date(now);
+    dCopy.setHours(0, 0, 0, 0);
+    const dayOfWeek = dCopy.getDay();
+    const diff = dCopy.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const recentMonday = new Date(dCopy.setDate(diff)).getTime();
+    
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    for (let t = todayMidnight - 86400000; t >= recentMonday; t -= 86400000) {
+      days.push(t);
     }
     return days;
   }, [now]);
@@ -227,11 +242,17 @@ export default function Performance() {
         let ptColor = entry.points_applied > 0 ? 'var(--error-color)' : entry.points_applied < 0 ? 'var(--accent-color)' : 'var(--text-secondary)';
         let ptSign = entry.points_applied > 0 ? '+' : '';
         
+        let displayValue = entry.points_applied !== 0 ? `${ptSign}${entry.points_applied}` : '';
+        if (entry.points_applied === 0 && entry.debt_applied !== 0) {
+            displayValue = `${entry.debt_applied > 0 ? '+' : ''}${entry.debt_applied}€`;
+            ptColor = entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)';
+        }
+        
         return (
           <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '8px' }}>{ruleName}</span>
             <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: ptColor }}>
-              {entry.points_applied !== 0 ? `${ptSign}${entry.points_applied}` : ''}
+              {displayValue}
             </span>
           </div>
         );
@@ -267,7 +288,7 @@ export default function Performance() {
           <div style={{ marginTop: '8px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Difference</span>
-              <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{Math.abs(myFinalPoints - oppFinalPoints)} pts</span>
+              <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{Math.abs(Math.max(0, myFinalPoints) - Math.max(0, oppFinalPoints))} pts</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Debt Added</span>
@@ -355,9 +376,10 @@ export default function Performance() {
                   if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
                   
                   const sign = entry.debt_applied > 0 ? '+' : '';
+                  const dayStr = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
                   return (
                     <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{name}</span>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{dayStr} - {name}</span>
                       <span style={{ fontSize: '0.9rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
                         {sign}{entry.debt_applied}€
                       </span>
@@ -455,27 +477,62 @@ export default function Performance() {
 
 
       {/* Past Days History */}
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '30px' }}>
         <h3 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Past Days</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {pastDays.map((ts) => {
-            const dateObj = new Date(ts);
-            const isExpanded = expandedDate === ts;
-            return (
-              <div key={ts} style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', overflow: 'hidden' }}>
-                <div 
-                  onClick={() => setExpandedDate(isExpanded ? null : ts)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', cursor: 'pointer' }}
-                >
-                  <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
-                    {dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </span>
-                  {isExpanded ? <ChevronUp size={20} color="var(--text-secondary)" /> : <ChevronDown size={20} color="var(--text-secondary)" />}
+          {pastDays.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--card-border)' }}>
+              No past days available for the current week yet.
+            </div>
+          ) : (
+            pastDays.map((ts) => {
+              const dateObj = new Date(ts);
+              const isExpanded = expandedDate === ts;
+              return (
+                <div key={ts} style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', overflow: 'hidden' }}>
+                  <div 
+                    onClick={() => setExpandedDate(isExpanded ? null : ts)}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                      {dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                    {isExpanded ? <ChevronUp size={20} color="var(--text-secondary)" /> : <ChevronDown size={20} color="var(--text-secondary)" />}
+                  </div>
+                  {isExpanded && renderHistoryFeed(ts)}
                 </div>
-                {isExpanded && renderHistoryFeed(ts)}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Total Debt Reductions (Last 14 Days) */}
+      <div style={{ marginBottom: '30px' }}>
+        <h3 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Total Debt Reductions (14 Days)</h3>
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
+          {totalDebtReductions.length === 0 ? (
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '10px 0' }}>No total debt reductions recently.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {totalDebtReductions.map(entry => {
+                const isMe = entry.user_id === userId;
+                const sign = entry.debt_applied > 0 ? '+' : '';
+                const dayStr = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                return (
+                  <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{isMe ? 'You' : oppName}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{dayStr}</span>
+                    </div>
+                    <span style={{ fontSize: '1rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
+                      {sign}{entry.debt_applied}€
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
