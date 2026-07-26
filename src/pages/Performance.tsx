@@ -7,7 +7,7 @@ export default function Performance() {
   const { 
     myPoints, myTotalDebt, myUnpaidWeeklyDebt, myWeeklyDebt,
     opponentPoints, opponentTotalDebt, opponentUnpaidWeeklyDebt, opponentWeeklyDebt,
-    opponentName, actionEntries, opponentActionEntries, rules, userId, opponentUserId, opponentLastWeeklyResetDate
+    opponentName, actionEntries, opponentActionEntries, rules, userId, opponentUserId, opponentLastWeeklyResetDate, lastWeeklyResetDate
   } = useTrackerStore();
 
   const oppName = opponentName || 'Mate';
@@ -17,20 +17,35 @@ export default function Performance() {
 
   const [chartMode, setChartMode] = useState<'intraday' | 'daily'>('daily');
   const [showOppDebtDropdown, setShowOppDebtDropdown] = useState(false);
+  const [showMyWeeklyDebt, setShowMyWeeklyDebt] = useState(false);
+  const [showMyTotalDebt, setShowMyTotalDebt] = useState(false);
+  const [showOppTotalDebt, setShowOppTotalDebt] = useState(false);
 
-  const resetTimestamp = opponentLastWeeklyResetDate ? new Date(opponentLastWeeklyResetDate).getTime() : 0;
+  const oppResetTimestamp = opponentLastWeeklyResetDate ? new Date(opponentLastWeeklyResetDate).getTime() : 0;
   const oppWeeklyDebtBreakdown = opponentActionEntries
-    .filter(a => !a.is_cancelled && a.timestamp > resetTimestamp && a.debt_applied !== 0)
+    .filter(a => !a.is_cancelled && a.timestamp > oppResetTimestamp && a.debt_applied !== 0)
     .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  const totalDebtReductions = useMemo(() => {
-    const cutoff = now.getTime() - 14 * 86400000;
-    const all = [...actionEntries, ...opponentActionEntries];
-    return all
-      .filter(a => !a.is_cancelled && a.timestamp >= cutoff && a.rule_id === 'adj_total')
-      .sort((a, b) => b.timestamp - a.timestamp);
-  }, [actionEntries, opponentActionEntries, now]);
+  const myResetTimestamp = lastWeeklyResetDate ? new Date(lastWeeklyResetDate).getTime() : 0;
+  const myWeeklyDebtBreakdown = actionEntries
+    .filter(a => !a.is_cancelled && a.timestamp > myResetTimestamp && a.debt_applied !== 0)
+    .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  const isTotalDebtRule = (rule_id: string) => {
+    if (rule_id === 'adj_total' || rule_id === 'ab_3') return true;
+    const rule = rules.find(r => r.id === rule_id);
+    return rule?.category === 'ABBAUEN';
+  };
+
+  const myTotalDebtBreakdown = actionEntries
+    .filter(a => !a.is_cancelled && isTotalDebtRule(a.rule_id))
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  const oppTotalDebtBreakdown = opponentActionEntries
+    .filter(a => !a.is_cancelled && isTotalDebtRule(a.rule_id))
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   // 1. Data Preparation: Daily Points (Last 14 Days)
   const dailyChartData = useMemo(() => {
@@ -194,6 +209,41 @@ export default function Performance() {
     return data;
   }, [actionEntries, opponentActionEntries, now]);
 
+  const totalDebtChartData = useMemo(() => {
+    const data = [];
+    let daysToDisplay = 13; // 14 days total including today
+
+    let currentMyDebt = myTotalDebt;
+    let currentOppDebt = opponentTotalDebt;
+
+    // Work backwards from today
+    for (let i = 0; i <= daysToDisplay; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const start = d.getTime();
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1).getTime();
+      
+      const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && isTotalDebtRule(a.rule_id));
+      const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && isTotalDebtRule(a.rule_id));
+      
+      let myDayDebt = 0;
+      for (const a of myDayActions) myDayDebt += a.debt_applied;
+      
+      let oppDayDebt = 0;
+      for (const a of oppDayActions) oppDayDebt += a.debt_applied;
+
+      data.unshift({
+        fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        myDebt: currentMyDebt,
+        oppDebt: currentOppDebt
+      });
+
+      currentMyDebt -= myDayDebt;
+      currentOppDebt -= oppDayDebt;
+    }
+    
+    return data;
+  }, [actionEntries, opponentActionEntries, now, myTotalDebt, opponentTotalDebt]);
+
   const chartDataToUse = chartMode === 'intraday' ? intradayData : dailyChartData;
   const xAxisKey = chartMode === 'intraday' ? 'time' : 'fullDate';
 
@@ -221,8 +271,18 @@ export default function Performance() {
     const start = dateTimestamp;
     const end = new Date(new Date(start).getFullYear(), new Date(start).getMonth(), new Date(start).getDate() + 1).getTime();
     
-    const myDay = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
-    const oppDay = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled);
+    const sortActions = (actions: any[]) => {
+      return actions.sort((a, b) => {
+        const aIsGm = a.rule_id?.startsWith('gm_');
+        const bIsGm = b.rule_id?.startsWith('gm_');
+        if (aIsGm && !bIsGm) return -1;
+        if (!aIsGm && bIsGm) return 1;
+        return a.timestamp - b.timestamp;
+      });
+    };
+
+    const myDay = sortActions(actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset'));
+    const oppDay = sortActions(opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset'));
     
     const dayData = dailyChartData.find((d: any) => d.dateValue === start);
     const myFinalPoints = dayData ? dayData.You : '-';
@@ -235,9 +295,8 @@ export default function Performance() {
         let ruleName = rule ? rule.name : 'Unknown';
         if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') ruleName = 'Mandatory Penalty';
         if (entry.rule_id === 'daily_debt_settlement') ruleName = 'Daily Debt Added';
-        if (entry.rule_id === 'weekly_reset') ruleName = 'Weekly Debt Reset';
         if (entry.rule_id === 'late_fee') ruleName = 'Late Fee (Unpaid Debt)';
-        if (entry.rule_id?.startsWith('gm_')) ruleName = 'GM / Sleep Tax';
+        if (entry.rule_id?.startsWith('gm_')) ruleName = 'GM';
         
         let ptColor = entry.points_applied > 0 ? 'var(--error-color)' : entry.points_applied < 0 ? 'var(--accent-color)' : 'var(--text-secondary)';
         let ptSign = entry.points_applied > 0 ? '+' : '';
@@ -325,71 +384,110 @@ export default function Performance() {
     return null;
   };
 
+  const renderBreakdown = (entries: any[]) => {
+    if (entries.length === 0) return <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>No actions recorded.</div>;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {entries.map(entry => {
+          const rule = rules.find(r => r.id === entry.rule_id);
+          let name = rule ? rule.name : entry.rule_id;
+          if (entry.rule_id === 'daily_debt_settlement') name = 'Daily Tax';
+          if (entry.rule_id === 'adj_weekly') name = 'Adjustment';
+          if (entry.rule_id === 'adj_total') name = 'Total Debt Adjust';
+          if (entry.rule_id === 'ab_3') name = 'Schulden bezahlen';
+          if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
+          
+          const sign = entry.debt_applied > 0 ? '+' : '';
+          const dayStr = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
+          return (
+            <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{dayStr} - {name}</span>
+              <span style={{ fontSize: '0.9rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
+                {sign}{entry.debt_applied}€
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="container" style={{ paddingBottom: '100px' }}>
       <div className="section-title" style={{ marginTop: '20px', marginBottom: '20px' }}>Performance</div>
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '30px' }}>
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '8px' }}>
-            <DollarSign size={14} /> Total Debt
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--error-color)' }}>{myTotalDebt}€</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{oppName}: {opponentTotalDebt}€</div>
-        </div>
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '8px' }}>
-            <TrendingDown size={14} /> Unpaid Weekly
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--error-color)' }}>{myUnpaidWeeklyDebt}€</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{oppName}: {opponentUnpaidWeeklyDebt}€</div>
-        </div>
-      </div>
-
-      {/* Opponent Debt Breakdown */}
-      <div style={{ marginBottom: '30px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
-        <div 
-          onClick={() => setShowOppDebtDropdown(!showOppDebtDropdown)}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <DollarSign size={16} color="var(--error-color)" />
-            <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{oppName}'s Weekly Debt ({opponentWeeklyDebt}€)</span>
-          </div>
-          <div style={{ color: 'var(--text-secondary)' }}>
-            {showOppDebtDropdown ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-          </div>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '30px' }}>
         
-        {showOppDebtDropdown && (
-          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
-            {oppWeeklyDebtBreakdown.length === 0 ? (
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center' }}>No actions recorded.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {oppWeeklyDebtBreakdown.map(entry => {
-                  const rule = rules.find(r => r.id === entry.rule_id);
-                  let name = rule ? rule.name : entry.rule_id;
-                  if (entry.rule_id === 'daily_debt_settlement') name = 'Daily Tax';
-                  if (entry.rule_id === 'adj_weekly') name = 'Adjustment';
-                  if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
-                  
-                  const sign = entry.debt_applied > 0 ? '+' : '';
-                  const dayStr = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
-                  return (
-                    <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{dayStr} - {name}</span>
-                      <span style={{ fontSize: '0.9rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
-                        {sign}{entry.debt_applied}€
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {/* TOTAL DEBT CARD */}
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '16px' }}>
+            <DollarSign size={16} /> Total Debt
           </div>
-        )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div onClick={() => setShowMyTotalDebt(!showMyTotalDebt)} style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: showMyTotalDebt ? '1px solid var(--accent-color)' : '1px solid transparent' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>You</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--error-color)' }}>{myTotalDebt}€</span>
+                {showMyTotalDebt ? <ChevronUp size={16} color="var(--text-secondary)" /> : <ChevronDown size={16} color="var(--text-secondary)" />}
+              </div>
+            </div>
+            <div onClick={() => setShowOppTotalDebt(!showOppTotalDebt)} style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: showOppTotalDebt ? '1px solid var(--accent-color)' : '1px solid transparent' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{oppName}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--error-color)' }}>{opponentTotalDebt}€</span>
+                {showOppTotalDebt ? <ChevronUp size={16} color="var(--text-secondary)" /> : <ChevronDown size={16} color="var(--text-secondary)" />}
+              </div>
+            </div>
+          </div>
+          {showMyTotalDebt && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>Your Reductions</div>
+              {renderBreakdown(myTotalDebtBreakdown)}
+            </div>
+          )}
+          {showOppTotalDebt && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>{oppName}'s Reductions</div>
+              {renderBreakdown(oppTotalDebtBreakdown)}
+            </div>
+          )}
+        </div>
+
+        {/* WEEKLY DEBT CARD */}
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '16px' }}>
+            <TrendingDown size={16} /> Weekly Debt
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div onClick={() => setShowMyWeeklyDebt(!showMyWeeklyDebt)} style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: showMyWeeklyDebt ? '1px solid var(--accent-color)' : '1px solid transparent' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>You</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--error-color)' }}>{myWeeklyDebt}€</span>
+                {showMyWeeklyDebt ? <ChevronUp size={16} color="var(--text-secondary)" /> : <ChevronDown size={16} color="var(--text-secondary)" />}
+              </div>
+            </div>
+            <div onClick={() => setShowOppDebtDropdown(!showOppDebtDropdown)} style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: showOppDebtDropdown ? '1px solid var(--accent-color)' : '1px solid transparent' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{oppName}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--error-color)' }}>{opponentWeeklyDebt}€</span>
+                {showOppDebtDropdown ? <ChevronUp size={16} color="var(--text-secondary)" /> : <ChevronDown size={16} color="var(--text-secondary)" />}
+              </div>
+            </div>
+          </div>
+          {showMyWeeklyDebt && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>Your Weekly Breakdowns</div>
+              {renderBreakdown(myWeeklyDebtBreakdown)}
+            </div>
+          )}
+          {showOppDebtDropdown && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>{oppName}'s Weekly Breakdowns</div>
+              {renderBreakdown(oppWeeklyDebtBreakdown)}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Points Chart */}
@@ -474,6 +572,33 @@ export default function Performance() {
         </div>
       </div>
 
+      {/* Total Debt Chart */}
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '24px', padding: '20px 10px', marginBottom: '30px' }}>
+        <h3 style={{ marginLeft: '10px', marginBottom: '20px', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Total Debt Activity (14 Days)</h3>
+        <div style={{ width: '100%', height: 200 }}>
+          <ResponsiveContainer>
+            <AreaChart data={totalDebtChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorMyTotalDebt" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#BF5AF2" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#BF5AF2" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorOppTotalDebt" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#64D2FF" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#64D2FF" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="fullDate" stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
+              <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="myDebt" name="You (Total Debt)" stroke="#BF5AF2" strokeWidth={3} fillOpacity={1} fill="url(#colorMyTotalDebt)" />
+              <Area type="monotone" dataKey="oppDebt" name={`${oppName} (Total Debt)`} stroke="#64D2FF" strokeWidth={3} fillOpacity={1} fill="url(#colorOppTotalDebt)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
 
 
       {/* Past Days History */}
@@ -495,7 +620,7 @@ export default function Performance() {
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', cursor: 'pointer' }}
                   >
                     <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
-                      {dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {dateObj.toLocaleDateString('en-US', { weekday: 'short' })}
                     </span>
                     {isExpanded ? <ChevronUp size={20} color="var(--text-secondary)" /> : <ChevronDown size={20} color="var(--text-secondary)" />}
                   </div>
@@ -503,35 +628,6 @@ export default function Performance() {
                 </div>
               );
             })
-          )}
-        </div>
-      </div>
-
-      {/* Total Debt Reductions (Last 14 Days) */}
-      <div style={{ marginBottom: '30px' }}>
-        <h3 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Total Debt Reductions (14 Days)</h3>
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '20px', padding: '16px' }}>
-          {totalDebtReductions.length === 0 ? (
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '10px 0' }}>No total debt reductions recently.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {totalDebtReductions.map(entry => {
-                const isMe = entry.user_id === userId;
-                const sign = entry.debt_applied > 0 ? '+' : '';
-                const dayStr = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                return (
-                  <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{isMe ? 'You' : oppName}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{dayStr}</span>
-                    </div>
-                    <span style={{ fontSize: '1rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
-                      {sign}{entry.debt_applied}€
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
           )}
         </div>
       </div>
