@@ -397,6 +397,7 @@ export default function Performance() {
           if (entry.rule_id === 'adj_weekly') name = 'Adjustment';
           if (entry.rule_id === 'adj_total') name = 'Total Debt Adjust';
           if (entry.rule_id === 'ab_3') name = 'Schulden bezahlen';
+          if (entry.rule_id === 'adj_points') name = 'Manual Points Edit';
           if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
           
           const sign = entry.debt_applied > 0 ? '+' : '';
@@ -454,6 +455,7 @@ export default function Performance() {
             if (entry.rule_id === 'adj_weekly') name = 'Adjustment';
             if (entry.rule_id === 'adj_total') name = 'Total Debt Adjust';
             if (entry.rule_id === 'ab_3') name = 'Schulden bezahlen';
+            if (entry.rule_id === 'adj_points') name = 'Manual Points Edit';
             if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
             
             const sign = entry.debt_applied > 0 ? '+' : '';
