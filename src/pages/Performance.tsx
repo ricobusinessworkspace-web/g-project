@@ -261,6 +261,28 @@ export default function Performance() {
             </div>
           </div>
         </div>
+        
+        {/* Difference & Debt Footer */}
+        {typeof myFinalPoints === 'number' && typeof oppFinalPoints === 'number' && (
+          <div style={{ marginTop: '8px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Difference</span>
+              <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{Math.abs(myFinalPoints - oppFinalPoints)} pts</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Debt Added</span>
+              <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--error-color)' }}>
+                {(() => {
+                  const myDebt = myDay.find(a => a.rule_id === 'daily_debt_settlement');
+                  const oppDebt = oppDay.find(a => a.rule_id === 'daily_debt_settlement');
+                  if (myDebt) return `${myDebt.debt_applied}€ (You)`;
+                  if (oppDebt) return `${oppDebt.debt_applied}€ (${oppName})`;
+                  return '0€';
+                })()}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
