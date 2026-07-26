@@ -25,12 +25,14 @@ export default function Performance() {
   const oppWeeklyDebtBreakdown = opponentActionEntries
     .filter(a => !a.is_cancelled && a.timestamp > oppResetTimestamp && a.debt_applied !== 0)
     .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
+    .filter(a => !isTotalDebtRule(a.rule_id))
     .sort((a, b) => b.timestamp - a.timestamp);
 
   const myResetTimestamp = lastWeeklyResetDate ? new Date(lastWeeklyResetDate).getTime() : 0;
   const myWeeklyDebtBreakdown = actionEntries
     .filter(a => !a.is_cancelled && a.timestamp > myResetTimestamp && a.debt_applied !== 0)
     .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
+    .filter(a => !isTotalDebtRule(a.rule_id))
     .sort((a, b) => b.timestamp - a.timestamp);
 
   const isTotalDebtRule = (rule_id: string) => {
@@ -281,8 +283,8 @@ export default function Performance() {
       });
     };
 
-    const myDay = sortActions(actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset'));
-    const oppDay = sortActions(opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset'));
+    const myDay = sortActions(actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'daily_debt_settlement'));
+    const oppDay = sortActions(opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'daily_debt_settlement'));
     
     const dayData = dailyChartData.find((d: any) => d.dateValue === start);
     const myFinalPoints = dayData ? dayData.You : '-';
@@ -353,8 +355,8 @@ export default function Performance() {
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Debt Added</span>
               <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--error-color)' }}>
                 {(() => {
-                  const myDebt = myDay.find(a => a.rule_id === 'daily_debt_settlement');
-                  const oppDebt = oppDay.find(a => a.rule_id === 'daily_debt_settlement');
+                  const myDebt = actionEntries.find(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id === 'daily_debt_settlement');
+                  const oppDebt = opponentActionEntries.find(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id === 'daily_debt_settlement');
                   if (myDebt) return `${myDebt.debt_applied}€ (You)`;
                   if (oppDebt) return `${oppDebt.debt_applied}€ (${oppName})`;
                   return '0€';
