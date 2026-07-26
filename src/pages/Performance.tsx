@@ -414,6 +414,63 @@ export default function Performance() {
     );
   };
 
+  const renderWeeklyBreakdown = (entries: any[]) => {
+    const dates = [];
+    const nowObj = new Date();
+    nowObj.setHours(0,0,0,0);
+    
+    // Find most recent Monday
+    const startObj = new Date(nowObj);
+    const day = startObj.getDay();
+    const diff = startObj.getDate() - day + (day === 0 ? -6 : 1);
+    startObj.setDate(diff);
+    
+    for (let d = new Date(nowObj); d >= startObj; d.setDate(d.getDate() - 1)) {
+      dates.push(new Date(d));
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {dates.map((dateObj, i) => {
+          const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+          const dayStart = dateObj.getTime();
+          const dayEnd = dayStart + 86400000;
+          
+          const dayEntries = entries.filter(e => e.timestamp >= dayStart && e.timestamp < dayEnd);
+          
+          if (dayEntries.length === 0) {
+            return (
+              <div key={`empty-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{dateStr}</span>
+                <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.2)', fontWeight: 'bold' }}>-</span>
+              </div>
+            );
+          }
+
+          return dayEntries.map(entry => {
+            const rule = rules.find(r => r.id === entry.rule_id);
+            let name = rule ? rule.name : entry.rule_id;
+            if (entry.rule_id === 'daily_debt_settlement') name = 'Daily Tax';
+            if (entry.rule_id === 'adj_weekly') name = 'Adjustment';
+            if (entry.rule_id === 'adj_total') name = 'Total Debt Adjust';
+            if (entry.rule_id === 'ab_3') name = 'Schulden bezahlen';
+            if (entry.rule_id?.startsWith('penalty_') || entry.rule_id === 'mandatory_penalty') name = 'Mandatory Penalty';
+            
+            const sign = entry.debt_applied > 0 ? '+' : '';
+            return (
+              <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{dateStr} - {name}</span>
+                <span style={{ fontSize: '0.9rem', color: entry.debt_applied > 0 ? 'var(--error-color)' : 'var(--accent-color)', fontWeight: 'bold' }}>
+                  {sign}{entry.debt_applied}€
+                </span>
+              </div>
+            );
+          });
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="container" style={{ paddingBottom: '100px' }}>
       <div className="section-title" style={{ marginTop: '20px', marginBottom: '20px' }}>Performance</div>
@@ -479,14 +536,14 @@ export default function Performance() {
           </div>
           {showMyWeeklyDebt && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>Your Weekly Breakdowns</div>
-              {renderBreakdown(myWeeklyDebtBreakdown)}
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>Your Weekly Entries</div>
+              {renderWeeklyBreakdown(myWeeklyDebtBreakdown)}
             </div>
           )}
           {showOppDebtDropdown && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--card-border)' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>{oppName}'s Weekly Breakdowns</div>
-              {renderBreakdown(oppWeeklyDebtBreakdown)}
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontWeight: 'bold' }}>{oppName}'s Weekly Entries</div>
+              {renderWeeklyBreakdown(oppWeeklyDebtBreakdown)}
             </div>
           )}
         </div>
