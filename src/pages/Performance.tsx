@@ -192,14 +192,14 @@ export default function Performance() {
         continue;
       }
 
-      const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee');
-      const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee');
+      const myDayActions = actionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee' && !isTotalDebtRule(a.rule_id));
+      const oppDayActions = opponentActionEntries.filter(a => a.timestamp >= start && a.timestamp < end && !a.is_cancelled && a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee' && !isTotalDebtRule(a.rule_id));
 
       for (const a of myDayActions) {
-        if (a.debt_applied > 0 || a.rule_id === 'adj_weekly') myRunningDebt += a.debt_applied;
+        if (a.debt_applied !== 0 || a.rule_id === 'adj_weekly') myRunningDebt += a.debt_applied;
       }
       for (const a of oppDayActions) {
-        if (a.debt_applied > 0 || a.rule_id === 'adj_weekly') oppRunningDebt += a.debt_applied;
+        if (a.debt_applied !== 0 || a.rule_id === 'adj_weekly') oppRunningDebt += a.debt_applied;
       }
 
       data.push({
