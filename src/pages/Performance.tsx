@@ -258,13 +258,10 @@ export default function Performance() {
     const days = [];
     const dCopy = new Date(now);
     dCopy.setHours(0, 0, 0, 0);
-    const dayOfWeek = dCopy.getDay();
-    const diff = dCopy.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    const recentMonday = new Date(dCopy.setDate(diff)).getTime();
+    const todayMidnight = dCopy.getTime();
     
-    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    for (let t = todayMidnight - 86400000; t >= recentMonday; t -= 86400000) {
-      days.push(t);
+    for (let i = 1; i <= 7; i++) {
+      days.push(todayMidnight - (i * 86400000));
     }
     return days;
   }, [now]);
