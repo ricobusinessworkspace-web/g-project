@@ -107,7 +107,7 @@ export default function Dashboard() {
     myGoofFreeDayUsed === currentSimDate || opponentGoofFreeDayUsed === currentSimDate;
   
   if (!isExemptFromSleep) {
-    if (currentHours >= 5) currentSleepTax += 5;
+    if (currentHours >= 5) currentSleepTax += 10;
     if (currentHours >= 6) currentSleepTax += 5;
     if (currentHours >= 7) currentSleepTax += 5;
     if (currentHours >= 8) currentSleepTax += 5;
@@ -119,11 +119,7 @@ export default function Dashboard() {
   if (opponentLastGmDate !== todayStr) {
     diffText = `${oppName} is still sleepy`;
   } else {
-    let displayOpponentPoints = 5;
-    if (opponentLastSettlementDate === todayStr) {
-      displayOpponentPoints = opponentPoints;
-    }
-    diffText = `${oppName}: ${displayOpponentPoints} pts`;
+    diffText = `${oppName}: ${opponentPoints} pts`;
   }
 
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();

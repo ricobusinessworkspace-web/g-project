@@ -567,7 +567,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       state.myGoofFreeDayUsed === currentSimDate || state.opponentGoofFreeDayUsed === currentSimDate;
     
     if (!isExempt) {
-      if (hours >= 5) sleepTax += 5; // sleepy after 4:59
+      if (hours >= 5) sleepTax += 10; // sleepy after 4:59
       if (hours >= 6) sleepTax += 5;  // every hour...
       if (hours >= 7) sleepTax += 5;
       if (hours >= 8) sleepTax += 5;  // ...until 8:00
@@ -981,7 +981,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
        let sleepTax = 0;
        const hours = wakeTime.getHours();
        if (!isExempt) {
-         if (hours >= 5) sleepTax += 5;
+         if (hours >= 5) sleepTax += 10;
          if (hours >= 6) sleepTax += 5;
          if (hours >= 7) sleepTax += 5;
          if (hours >= 8) sleepTax += 5;
@@ -1010,7 +1010,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
        let sleepTax = 0;
        const hours = wakeTime.getHours();
        if (!isExempt) {
-         if (hours >= 5) sleepTax += 5;
+         if (hours >= 5) sleepTax += 10;
          if (hours >= 6) sleepTax += 5;
          if (hours >= 7) sleepTax += 5;
          if (hours >= 8) sleepTax += 5;
