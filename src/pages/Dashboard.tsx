@@ -115,12 +115,7 @@ export default function Dashboard() {
   
   const oppName = opponentName || 'Bitch Jigger';
   
-  let diffText = "";
-  if (opponentLastGmDate !== todayStr) {
-    diffText = `${oppName} is still sleepy`;
-  } else {
-    diffText = `${oppName}: ${opponentPoints} pts`;
-  }
+  let diffText = `${oppName}: ${opponentPoints} pts ${opponentLastGmDate !== todayStr ? '(Sleepy)' : ''}`;
 
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const endOfDay = startOfDay + 86400000;
