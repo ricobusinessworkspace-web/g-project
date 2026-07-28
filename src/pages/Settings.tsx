@@ -139,8 +139,7 @@ export default function SettingsPage() {
                   checked={myTripAbroad || opponentTripAbroad} 
                   onChange={(e) => {
                     const checked = e.target.checked;
-                    setTripAbroad(checked);
-                    if (opponentUserId) setOpponentTripAbroad(checked);
+                    setSharedTripAbroad(checked);
                   }} 
                 />
                 <span className="slider"></span>
@@ -157,8 +156,7 @@ export default function SettingsPage() {
                   checked={myFamilyTrip || opponentFamilyTrip} 
                   onChange={(e) => {
                     const checked = e.target.checked;
-                    setFamilyTrip(checked);
-                    if (opponentUserId) setOpponentFamilyTrip(checked);
+                    setSharedFamilyTrip(checked);
                   }} 
                 />
                 <span className="slider"></span>
@@ -175,8 +173,7 @@ export default function SettingsPage() {
                   checked={mySicko || opponentSicko} 
                   onChange={(e) => {
                     const checked = e.target.checked;
-                    setSicko(checked);
-                    if (opponentUserId) setOpponentSicko(checked);
+                    setSharedSicko(checked);
                   }} 
                 />
                 <span className="slider"></span>

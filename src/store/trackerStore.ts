@@ -134,6 +134,10 @@ interface TrackerState {
   updateName: (newName: string) => Promise<void>;
   settleWeeklyDebt: () => Promise<void>;
   resetDay: () => void;
+  setSharedTripAbroad: (value: boolean) => Promise<void>;
+  setSharedFamilyTrip: (value: boolean) => Promise<void>;
+  setSharedSicko: (value: boolean) => Promise<void>;
+  
   setTripAbroad: (value: boolean) => Promise<void>;
   setFamilyTrip: (value: boolean) => Promise<void>;
   setSicko: (value: boolean) => Promise<void>;
@@ -578,7 +582,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     // We store the full points (base 5 + tax) in the action so history displays correctly.
     // However, catchUpEngine already gave us 5 points, so we only ADD the sleepTax to myPoints.
     const totalGmPoints = 5 + sleepTax;
-    const gmActionId = 'gm_' + todayStr;
+    const gmActionId = 'gm_' + todayStr + '_' + state.userId;
     
     await supabase.from('tracker_action_entries').upsert({
       id: gmActionId,
@@ -624,7 +628,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
   updateGm: async (wakeTime: Date, forcedLogicalDay?: string) => {
       const todayStr = forcedLogicalDay || getLogicalDate(wakeTime);
-      await get().undoAction('gm_' + todayStr);
+      await get().undoAction('gm_' + todayStr + '_' + get().userId);
       await get().logGm(wakeTime, todayStr);
   },
 
@@ -898,6 +902,36 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   resetDay: () => set({ myPoints: 5, myDebt: 0, actionEntries: [] }),
   resetGm: () => set({ lastGmDate: null }),
   
+  setSharedTripAbroad: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myTripAbroad: value, opponentTripAbroad: value });
+    const updates = [{ user_id: state.userId, trip_abroad: value }];
+    if (state.opponentUserId) updates.push({ user_id: state.opponentUserId, trip_abroad: value });
+    await supabase.from('tracker_user_stats').upsert(updates);
+    await get().recalculateTodayGms();
+  },
+
+  setSharedFamilyTrip: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myFamilyTrip: value, opponentFamilyTrip: value });
+    const updates = [{ user_id: state.userId, family_trip: value }];
+    if (state.opponentUserId) updates.push({ user_id: state.opponentUserId, family_trip: value });
+    await supabase.from('tracker_user_stats').upsert(updates);
+    await get().recalculateTodayGms();
+  },
+
+  setSharedSicko: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ mySicko: value, opponentSicko: value });
+    const updates = [{ user_id: state.userId, sicko: value }];
+    if (state.opponentUserId) updates.push({ user_id: state.opponentUserId, sicko: value });
+    await supabase.from('tracker_user_stats').upsert(updates);
+    await get().recalculateTodayGms();
+  },
+
   setTripAbroad: async (value: boolean) => {
     const state = get();
     if (!state.userId) return;
@@ -974,7 +1008,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       state.myGoofFreeDayUsed === currentSimDate || state.opponentGoofFreeDayUsed === currentSimDate;
     
     // Find GM for me
-    const myGmId = 'gm_' + todayStr;
+    const myGmId = 'gm_' + todayStr + '_' + state.userId;
     const myGmEntry = state.actionEntries.find(a => a.id === myGmId);
     if (myGmEntry) {
        const wakeTime = new Date(myGmEntry.timestamp);
@@ -1003,7 +1037,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     }
     
     // Find GM for opponent
-    const oppGmId = 'gm_' + todayStr;
+    const oppGmId = 'gm_' + todayStr + '_' + state.opponentUserId;
     const oppGmEntry = state.opponentActionEntries.find(a => a.id === oppGmId);
     if (oppGmEntry) {
        const wakeTime = new Date(oppGmEntry.timestamp);
