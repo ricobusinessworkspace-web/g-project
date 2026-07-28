@@ -11,9 +11,9 @@ export default function SettingsPage() {
     opponentTripAbroad, opponentFamilyTrip, opponentSicko, opponentGoofFreeDayUsed,
     setOpponentTripAbroad, setOpponentFamilyTrip, setOpponentSicko, setOpponentGoofFreeDay,
     adjustDebt, settleWeeklyDebt,
-    myTripAbroad, setTripAbroad,
-    myFamilyTrip, setFamilyTrip,
-    mySicko, setSicko,
+    myTripAbroad, setTripAbroad, setSharedTripAbroad,
+    myFamilyTrip, setFamilyTrip, setSharedFamilyTrip,
+    mySicko, setSicko, setSharedSicko,
     myGoofFreeDayUsed, setGoofFreeDay,
     userName, updateName, myPoints, adjustPoints,
     actionEntries, lastGmDate, updateGm, logGm
