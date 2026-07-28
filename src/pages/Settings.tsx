@@ -129,61 +129,59 @@ export default function SettingsPage() {
       <div style={{ marginBottom: '32px' }}>
         <div className="section-title">EXEMPTIONS (EQUAL TAXATION)</div>
         <div className="card-list">
+
           <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
               <span className="card-row-label">✈️ Trip Abroad (Goof Free)</span>
               <label className="switch">
-                <input type="checkbox" checked={myTripAbroad} onChange={(e) => setTripAbroad(e.target.checked)} />
+                <input 
+                  type="checkbox" 
+                  checked={myTripAbroad || opponentTripAbroad} 
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setTripAbroad(checked);
+                    if (opponentUserId) setOpponentTripAbroad(checked);
+                  }} 
+                />
                 <span className="slider"></span>
               </label>
             </div>
-            {opponentUserId && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginTop: '4px', opacity: 0.8 }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Active for {opponentName}</span>
-                <label className="switch" style={{ transform: 'scale(0.8)', transformOrigin: 'right center' }}>
-                  <input type="checkbox" checked={opponentTripAbroad} onChange={(e) => setOpponentTripAbroad(e.target.checked)} />
-                  <span className="slider"></span>
-                </label>
-              </div>
-            )}
           </div>
           
           <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
               <span className="card-row-label">👨‍👩‍👧 Family Trip (No Sleep Rules)</span>
               <label className="switch">
-                <input type="checkbox" checked={myFamilyTrip} onChange={(e) => setFamilyTrip(e.target.checked)} />
+                <input 
+                  type="checkbox" 
+                  checked={myFamilyTrip || opponentFamilyTrip} 
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFamilyTrip(checked);
+                    if (opponentUserId) setOpponentFamilyTrip(checked);
+                  }} 
+                />
                 <span className="slider"></span>
               </label>
             </div>
-            {opponentUserId && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginTop: '4px', opacity: 0.8 }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Active for {opponentName}</span>
-                <label className="switch" style={{ transform: 'scale(0.8)', transformOrigin: 'right center' }}>
-                  <input type="checkbox" checked={opponentFamilyTrip} onChange={(e) => setOpponentFamilyTrip(e.target.checked)} />
-                  <span className="slider"></span>
-                </label>
-              </div>
-            )}
           </div>
           
           <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
               <span className="card-row-label">🤒 Sicko (Krank)</span>
               <label className="switch">
-                <input type="checkbox" checked={mySicko} onChange={(e) => setSicko(e.target.checked)} />
+                <input 
+                  type="checkbox" 
+                  checked={mySicko || opponentSicko} 
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setSicko(checked);
+                    if (opponentUserId) setOpponentSicko(checked);
+                  }} 
+                />
                 <span className="slider"></span>
               </label>
             </div>
-            {opponentUserId && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginTop: '4px', opacity: 0.8 }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Active for {opponentName}</span>
-                <label className="switch" style={{ transform: 'scale(0.8)', transformOrigin: 'right center' }}>
-                  <input type="checkbox" checked={opponentSicko} onChange={(e) => setOpponentSicko(e.target.checked)} />
-                  <span className="slider"></span>
-                </label>
-              </div>
-            )}
           </div>
           <div className="card-row">
             <span className="card-row-label">🌴 Use Goof Free Day</span>
