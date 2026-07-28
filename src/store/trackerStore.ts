@@ -139,6 +139,12 @@ interface TrackerState {
   setSicko: (value: boolean) => Promise<void>;
   setGoofFreeDay: (date: string | null) => Promise<void>;
   
+  setOpponentTripAbroad: (value: boolean) => Promise<void>;
+  setOpponentFamilyTrip: (value: boolean) => Promise<void>;
+  setOpponentSicko: (value: boolean) => Promise<void>;
+  setOpponentGoofFreeDay: (date: string | null) => Promise<void>;
+  
+  recalculateTodayGms: () => Promise<void>;
   checkAndRunSettlement: () => Promise<void>;
   logGm: (wakeTime: Date) => void;
   updateGm: (wakeTime: Date) => void;
@@ -544,7 +550,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const state = get();
     if (!state.userId) return;
     
-    await get().checkAndRunSettlement();
+    // Run in background without blocking the UI/Save
+    get().checkAndRunSettlement().catch(console.error);
 
     const todayStr = forcedLogicalDay || getLogicalDate(wakeTime); 
 
@@ -630,7 +637,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       return;
     }
 
-    await get().checkAndRunSettlement();
+    // Run in background without blocking the UI/Save
+    get().checkAndRunSettlement().catch(console.error);
 
     let pointsToApply = 0;
     let debtToApply = 0;
@@ -895,6 +903,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (!state.userId) return;
     set({ myTripAbroad: value });
     await supabase.from('tracker_user_stats').update({ trip_abroad: value }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
   },
   
   setFamilyTrip: async (value: boolean) => {
@@ -902,6 +911,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (!state.userId) return;
     set({ myFamilyTrip: value });
     await supabase.from('tracker_user_stats').update({ family_trip: value }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
   },
   
   setSicko: async (value: boolean) => {
@@ -909,6 +919,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (!state.userId) return;
     set({ mySicko: value });
     await supabase.from('tracker_user_stats').update({ sicko: value }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
   },
   
   setGoofFreeDay: async (date: string | null) => {
@@ -916,5 +927,108 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (!state.userId) return;
     set({ myGoofFreeDayUsed: date });
     await supabase.from('tracker_user_stats').update({ goof_free_day_used: date }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
+  },
+
+  setOpponentTripAbroad: async (value: boolean) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentTripAbroad: value });
+    await supabase.from('tracker_user_stats').update({ trip_abroad: value }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+  
+  setOpponentFamilyTrip: async (value: boolean) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentFamilyTrip: value });
+    await supabase.from('tracker_user_stats').update({ family_trip: value }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+  
+  setOpponentSicko: async (value: boolean) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentSicko: value });
+    await supabase.from('tracker_user_stats').update({ sicko: value }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+  
+  setOpponentGoofFreeDay: async (date: string | null) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentGoofFreeDayUsed: date });
+    await supabase.from('tracker_user_stats').update({ goof_free_day_used: date }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+
+  recalculateTodayGms: async () => {
+    const state = get();
+    const todayStr = getLogicalDate(new Date());
+    const currentSimDate = getISODate(new Date());
+
+    const isExempt = 
+      state.myFamilyTrip || state.opponentFamilyTrip ||
+      state.myTripAbroad || state.opponentTripAbroad ||
+      state.mySicko || state.opponentSicko ||
+      state.myGoofFreeDayUsed === currentSimDate || state.opponentGoofFreeDayUsed === currentSimDate;
+    
+    // Find GM for me
+    const myGmId = 'gm_' + todayStr;
+    const myGmEntry = state.actionEntries.find(a => a.id === myGmId);
+    if (myGmEntry) {
+       const wakeTime = new Date(myGmEntry.timestamp);
+       let sleepTax = 0;
+       const hours = wakeTime.getHours();
+       if (!isExempt) {
+         if (hours >= 5) sleepTax += 5;
+         if (hours >= 6) sleepTax += 5;
+         if (hours >= 7) sleepTax += 5;
+         if (hours >= 8) sleepTax += 5;
+       }
+       const totalGmPoints = 5 + sleepTax;
+       
+       if (myGmEntry.points_applied !== totalGmPoints) {
+           const diff = totalGmPoints - myGmEntry.points_applied;
+           const newPoints = state.myPoints + diff;
+           
+           await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', myGmId);
+           await supabase.from('tracker_user_stats').update({ my_points: newPoints }).eq('user_id', state.userId);
+           
+           set({
+               myPoints: newPoints,
+               actionEntries: state.actionEntries.map(e => e.id === myGmId ? { ...e, points_applied: totalGmPoints } : e)
+           });
+       }
+    }
+    
+    // Find GM for opponent
+    const oppGmId = 'gm_' + todayStr;
+    const oppGmEntry = state.opponentActionEntries.find(a => a.id === oppGmId);
+    if (oppGmEntry) {
+       const wakeTime = new Date(oppGmEntry.timestamp);
+       let sleepTax = 0;
+       const hours = wakeTime.getHours();
+       if (!isExempt) {
+         if (hours >= 5) sleepTax += 5;
+         if (hours >= 6) sleepTax += 5;
+         if (hours >= 7) sleepTax += 5;
+         if (hours >= 8) sleepTax += 5;
+       }
+       const totalGmPoints = 5 + sleepTax;
+       
+       if (oppGmEntry.points_applied !== totalGmPoints) {
+           const diff = totalGmPoints - oppGmEntry.points_applied;
+           const newPoints = state.opponentPoints + diff;
+           
+           await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', oppGmId);
+           await supabase.from('tracker_user_stats').update({ my_points: newPoints }).eq('user_id', state.opponentUserId);
+           
+           set({
+               opponentPoints: newPoints,
+               opponentActionEntries: state.opponentActionEntries.map(e => e.id === oppGmId ? { ...e, points_applied: totalGmPoints } : e)
+           });
+       }
+    }
   },
 }));

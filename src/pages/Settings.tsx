@@ -9,6 +9,7 @@ export default function SettingsPage() {
     isOnline, userId, myTotalDebt, myWeeklyDebt, myUnpaidWeeklyDebt, 
     opponentName, opponentUserId, opponentTotalDebt, opponentWeeklyDebt, opponentActionEntries, 
     opponentTripAbroad, opponentFamilyTrip, opponentSicko, opponentGoofFreeDayUsed,
+    setOpponentTripAbroad, setOpponentFamilyTrip, setOpponentSicko, setOpponentGoofFreeDay,
     adjustDebt, settleWeeklyDebt,
     myTripAbroad, setTripAbroad,
     myFamilyTrip, setFamilyTrip,
@@ -136,7 +137,15 @@ export default function SettingsPage() {
                 <span className="slider"></span>
               </label>
             </div>
-            {opponentTripAbroad && <span style={{ fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: '500' }}>Active for {opponentName} (Equal Taxation applies)</span>}
+            {opponentUserId && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginTop: '4px', opacity: 0.8 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Active for {opponentName}</span>
+                <label className="switch" style={{ transform: 'scale(0.8)', transformOrigin: 'right center' }}>
+                  <input type="checkbox" checked={opponentTripAbroad} onChange={(e) => setOpponentTripAbroad(e.target.checked)} />
+                  <span className="slider"></span>
+                </label>
+              </div>
+            )}
           </div>
           
           <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
@@ -147,7 +156,15 @@ export default function SettingsPage() {
                 <span className="slider"></span>
               </label>
             </div>
-            {opponentFamilyTrip && <span style={{ fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: '500' }}>Active for {opponentName} (Equal Taxation applies)</span>}
+            {opponentUserId && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginTop: '4px', opacity: 0.8 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Active for {opponentName}</span>
+                <label className="switch" style={{ transform: 'scale(0.8)', transformOrigin: 'right center' }}>
+                  <input type="checkbox" checked={opponentFamilyTrip} onChange={(e) => setOpponentFamilyTrip(e.target.checked)} />
+                  <span className="slider"></span>
+                </label>
+              </div>
+            )}
           </div>
           
           <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
@@ -158,7 +175,15 @@ export default function SettingsPage() {
                 <span className="slider"></span>
               </label>
             </div>
-            {opponentSicko && <span style={{ fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: '500' }}>Active for {opponentName} (Equal Taxation applies)</span>}
+            {opponentUserId && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginTop: '4px', opacity: 0.8 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Active for {opponentName}</span>
+                <label className="switch" style={{ transform: 'scale(0.8)', transformOrigin: 'right center' }}>
+                  <input type="checkbox" checked={opponentSicko} onChange={(e) => setOpponentSicko(e.target.checked)} />
+                  <span className="slider"></span>
+                </label>
+              </div>
+            )}
           </div>
           <div className="card-row">
             <span className="card-row-label">🌴 Use Goof Free Day</span>
