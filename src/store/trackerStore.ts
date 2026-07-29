@@ -741,13 +741,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: debtToApply,
     });
     if (insertActionErr) alert('Insert Action Error: ' + insertActionErr.message);
-
-    const { error: actionErr } = await supabase.from('tracker_user_stats').update({
-      my_points: get().myPoints,
-      my_debt: get().myDebt,
-      my_weekly_debt: get().myWeeklyDebt,
-      my_total_debt: get().myTotalDebt,
-    }).eq('user_id', state.userId);
     if (actionErr) alert('Action Update Error: ' + actionErr.message);
   },
   
@@ -787,13 +780,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       .update({ is_cancelled: true })
       .eq('user_id', state.userId)
       .eq('id', entry.id);
-
-    await supabase.from('tracker_user_stats').update({
-      my_points: get().myPoints,
-      my_debt: get().myDebt,
-      my_weekly_debt: get().myWeeklyDebt,
-      my_total_debt: get().myTotalDebt,
-    }).eq('user_id', state.userId);
   },
   
   adjustDebt: async (type: 'WEEKLY' | 'TOTAL', newAmount: number) => {
@@ -835,11 +821,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       points_applied: 0,
       debt_applied: debtDiff,
     });
-
-    await supabase.from('tracker_user_stats').update({
-      my_weekly_debt: isWeekly ? newAmount : state.myWeeklyDebt,
-      my_total_debt: !isWeekly ? newAmount : state.myTotalDebt,
-    }).eq('user_id', state.userId);
   },
 
   adjustPoints: async (newAmount: number) => {
@@ -873,10 +854,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       points_applied: pointsDiff,
       debt_applied: 0,
     });
-
-    await supabase.from('tracker_user_stats').update({
-      my_points: newAmount,
-    }).eq('user_id', state.userId);
   },
 
   updateName: async (newName: string) => {
@@ -1027,7 +1004,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
            const newPoints = state.myPoints + diff;
            
            await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', myGmId);
-           await supabase.from('tracker_user_stats').update({ my_points: newPoints }).eq('user_id', state.userId);
            
            set({
                myPoints: newPoints,
@@ -1056,7 +1032,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
            const newPoints = state.opponentPoints + diff;
            
            await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', oppGmId);
-           await supabase.from('tracker_user_stats').update({ my_points: newPoints }).eq('user_id', state.opponentUserId);
            
            set({
                opponentPoints: newPoints,
