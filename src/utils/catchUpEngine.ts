@@ -107,6 +107,7 @@ export const runCatchUpEngine = async (state: any, set: any) => {
              const removedWeekly = userCtx.weekly;
              if (removedWeekly < 0) {
                  userCtx.debt += removedWeekly; // spilled over (negative means it reduces debt)
+                 allInserts.push({ id: Math.random().toString(), user_id: uid, rule_id: 'weekly_spillover', timestamp: simDateObj.getTime() + 1000, points_applied: 0, debt_applied: removedWeekly });
              } else {
                  userCtx.unpaid += removedWeekly; // moves to unpaid
              }
