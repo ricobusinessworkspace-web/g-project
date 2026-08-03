@@ -184,6 +184,7 @@ export const runCatchUpEngine = async (state: any, set: any) => {
           last_settlement_date: todayStr,
           my_points: 5,
           my_debt: ctx[state.userId].debt,
+          my_total_debt: ctx[state.userId].debt,
           my_weekly_debt: ctx[state.userId].weekly,
           unpaid_weekly_debt: ctx[state.userId].unpaid,
           last_weekly_reset_date: ctx[state.userId].lastReset,
@@ -196,6 +197,8 @@ export const runCatchUpEngine = async (state: any, set: any) => {
       updatesOpp = {
           last_settlement_date: todayStr,
           my_points: 5,
+          my_debt: ctx[state.opponentUserId].debt,
+          my_total_debt: ctx[state.opponentUserId].debt,
           my_weekly_debt: ctx[state.opponentUserId].weekly,
           unpaid_weekly_debt: ctx[state.opponentUserId].unpaid,
           last_weekly_reset_date: ctx[state.opponentUserId].lastReset,
@@ -212,6 +215,7 @@ export const runCatchUpEngine = async (state: any, set: any) => {
               lastSettlementDate: todayStr,
               myPoints: 5,
               myDebt: ctx[state.userId].debt,
+              myTotalDebt: ctx[state.userId].debt,
               myWeeklyDebt: ctx[state.userId].weekly,
               myUnpaidWeeklyDebt: ctx[state.userId].unpaid,
               lastWeeklyResetDate: ctx[state.userId].lastReset,
@@ -224,6 +228,7 @@ export const runCatchUpEngine = async (state: any, set: any) => {
               opponentLastSettlementDate: todayStr,
               opponentPoints: 5,
               opponentWeeklyDebt: ctx[state.opponentUserId].weekly,
+              opponentTotalDebt: ctx[state.opponentUserId].debt,
               opponentUnpaidWeeklyDebt: ctx[state.opponentUserId].unpaid,
               opponentLastWeeklyResetDate: ctx[state.opponentUserId].lastReset,
               opponentLastLatePayDate: ctx[state.opponentUserId].lastLate

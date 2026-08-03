@@ -115,6 +115,8 @@ interface TrackerState {
   isLoading: boolean;
   isOnline: boolean;
   
+  selectedDate: string | null;
+
   lastSettlementDate: string | null;
   lastWeeklyResetDate: string | null;
   lastGmDate: string | null;
@@ -154,6 +156,9 @@ interface TrackerState {
   updateGm: (wakeTime: Date) => void;
   resetGm: () => void;
   setOpponentPoints: (points: number) => void;
+  setSelectedDate: (date: string | null) => void;
+  requestDraw: () => Promise<void>;
+  acceptDraw: () => Promise<void>;
 }
 
 export const useTrackerStore = create<TrackerState>((set, get) => ({
@@ -183,6 +188,9 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   opponentFamilyTrip: false,
   opponentSicko: false,
   opponentGoofFreeDayUsed: null,
+  
+  selectedDate: null,
+
   rules: [],
   actionEntries: [],
   opponentActionEntries: [],
@@ -564,7 +572,12 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     
     // Equal taxation for Exemptions -> No sleep rules
     const currentSimDate = getISODate(new Date());
+    const hasDraw = 
+      (state.actionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr) &&
+       state.opponentActionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr));
+
     const isExempt = 
+      hasDraw ||
       state.myFamilyTrip || state.opponentFamilyTrip ||
       state.myTripAbroad || state.opponentTripAbroad ||
       state.mySicko || state.opponentSicko ||
@@ -702,8 +715,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         }
       }
     }
-
-    const timestamp = Date.now();
+    const targetDate = state.selectedDate;
+    const timestamp = targetDate ? new Date(targetDate).getTime() + 1000 : Date.now();
 
     const newEntry: ActionEntry = {
       id: Math.random().toString(),
@@ -741,7 +754,6 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: debtToApply,
     });
     if (insertActionErr) alert('Insert Action Error: ' + insertActionErr.message);
-    if (actionErr) alert('Action Update Error: ' + actionErr.message);
   },
   
   undoAction: async (actionId: string) => {
@@ -796,8 +808,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     }
 
     if (debtDiff === 0) return;
-
-    const timestamp = Date.now();
+    const targetDate = state.selectedDate;
+    const timestamp = targetDate ? new Date(targetDate).getTime() + 1000 : Date.now();
     const rule_id = isWeekly ? 'adj_weekly' : 'adj_total';
 
     const newEntry: ActionEntry = {
@@ -829,8 +841,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const pointsDiff = newAmount - state.myPoints;
     if (pointsDiff === 0) return;
-
-    const timestamp = Date.now();
+    const targetDate = state.selectedDate;
+    const timestamp = targetDate ? new Date(targetDate).getTime() + 1000 : Date.now();
     const rule_id = 'adj_points';
 
     const newEntry: ActionEntry = {
@@ -973,12 +985,76 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     await get().recalculateTodayGms();
   },
 
+  setSelectedDate: (date: string | null) => {
+    set({ selectedDate: date });
+    get().recalculateTodayGms();
+  },
+
+  requestDraw: async () => {
+    const state = get();
+    if (!state.userId) return;
+    const targetDate = state.selectedDate || getISODate(new Date());
+    const timestamp = new Date(targetDate).getTime() + 1000;
+    
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: 'draw_request',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    };
+
+    set({ actionEntries: [...state.actionEntries, newEntry] });
+
+    await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: 'draw_request',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    });
+  },
+
+  acceptDraw: async () => {
+    const state = get();
+    if (!state.userId) return;
+    const targetDate = state.selectedDate || getISODate(new Date());
+    const timestamp = new Date(targetDate).getTime() + 1000;
+    
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: 'draw_accept',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    };
+
+    set({ actionEntries: [...state.actionEntries, newEntry] });
+
+    await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: 'draw_accept',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    });
+  },
+
   recalculateTodayGms: async () => {
     const state = get();
-    const todayStr = getLogicalDate(new Date());
+    if (!state.userId) return;
+    
+    const todayStr = state.selectedDate || getISODate(new Date());
     const currentSimDate = getISODate(new Date());
 
+    const hasDraw = 
+      (state.actionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr) &&
+       state.opponentActionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr));
+
     const isExempt = 
+      hasDraw ||
       state.myFamilyTrip || state.opponentFamilyTrip ||
       state.myTripAbroad || state.opponentTripAbroad ||
       state.mySicko || state.opponentSicko ||

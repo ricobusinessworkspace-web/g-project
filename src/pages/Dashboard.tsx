@@ -31,7 +31,11 @@ export default function Dashboard() {
     mySicko,
     opponentSicko,
     myGoofFreeDayUsed,
-    opponentGoofFreeDayUsed
+    opponentGoofFreeDayUsed,
+    selectedDate,
+    setSelectedDate,
+    requestDraw,
+    acceptDraw
   } = useTrackerStore();
 
   const [selectedRule, setSelectedRule] = useState<any>(null);
@@ -43,8 +47,11 @@ export default function Dashboard() {
   const [startY, setStartY] = useState(0);
 
   const now = new Date();
-  const todayStr = getLogicalDate(now);
-  const needsGm = lastGmDate !== todayStr && now.getHours() >= 4;
+  const effectiveDateStr = selectedDate || getLogicalDate(now);
+  const isToday = effectiveDateStr === getLogicalDate(now);
+  
+  const hasGmForDate = actionEntries.some(a => !a.is_cancelled && a.id === 'gm_' + effectiveDateStr + '_' + userId);
+  const needsGm = !hasGmForDate && (!isToday || now.getHours() >= 4);
 
   if (isLoading) {
     return (
@@ -115,9 +122,10 @@ export default function Dashboard() {
   
   const oppName = opponentName || 'Bitch Jigger';
   
-  let diffText = `${oppName}: ${opponentPoints} pts ${opponentLastGmDate !== todayStr ? '(Sleepy)' : ''}`;
+  let diffText = `${oppName}: ${opponentPoints} pts ${opponentLastGmDate !== getLogicalDate(now) ? '(Sleepy)' : ''}`;
 
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const activeDate = selectedDate ? new Date(selectedDate) : now;
+  const startOfDay = new Date(activeDate.getFullYear(), activeDate.getMonth(), activeDate.getDate()).getTime();
   const endOfDay = startOfDay + 86400000;
 
   const allMyActionsDesc = [...actionEntries].sort((a, b) => b.timestamp - a.timestamp);
@@ -273,8 +281,45 @@ export default function Dashboard() {
     >
       <Toaster position="bottom-center" />
 
+      {/* Date Picker & Draw Controls */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', gap: '12px' }}>
+        <input 
+          type="date" 
+          value={selectedDate || ''} 
+          onChange={(e) => setSelectedDate(e.target.value || null)}
+          style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '20px',
+            fontFamily: 'inherit',
+            fontSize: '0.9rem',
+            outline: 'none'
+          }}
+        />
+        {(() => {
+          const isDrawDay = 
+            actionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_accept' || a.rule_id === 'draw_request') && getISODate(new Date(a.timestamp)) === effectiveDateStr) &&
+            opponentActionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_accept' || a.rule_id === 'draw_request') && getISODate(new Date(a.timestamp)) === effectiveDateStr);
+          
+          const drawRequestedByMe = actionEntries.some(a => !a.is_cancelled && a.rule_id === 'draw_request' && getISODate(new Date(a.timestamp)) === effectiveDateStr);
+          const drawRequestedByOpp = opponentActionEntries.some(a => !a.is_cancelled && a.rule_id === 'draw_request' && getISODate(new Date(a.timestamp)) === effectiveDateStr);
+
+          if (isDrawDay) {
+            return <div style={{ color: '#FFCC00', fontWeight: 'bold', fontSize: '0.9rem' }}>🤝 Draw Accepted (Exempt Day)</div>;
+          } else if (drawRequestedByOpp) {
+            return <button onClick={acceptDraw} style={{ background: '#34C759', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer' }}>🤝 Accept Draw</button>;
+          } else if (drawRequestedByMe) {
+            return <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>⏳ Waiting for Draw Accept...</div>;
+          } else {
+            return <button onClick={requestDraw} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '16px', fontSize: '0.85rem', cursor: 'pointer' }}>🤝 Request Draw</button>;
+          }
+        })()}
+      </div>
+
       {/* Header / Main Score */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', marginBottom: '60px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '10px', marginBottom: '60px' }}>
         <div className="section-title">Account</div>
         <div className="tabular-nums" style={{ fontSize: '130px', letterSpacing: '-6px', margin: '10px 0', lineHeight: '1' }}>
           {myPoints}
