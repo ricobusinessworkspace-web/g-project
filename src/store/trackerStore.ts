@@ -754,6 +754,11 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       debt_applied: debtToApply,
     });
     if (insertActionErr) alert('Insert Action Error: ' + insertActionErr.message);
+
+    await supabase.from('tracker_user_stats').update({
+      my_weekly_debt: newWeeklyDebt,
+      my_total_debt: newTotalDebt
+    }).eq('user_id', state.userId);
   },
   
   undoAction: async (actionId: string) => {
@@ -792,6 +797,11 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       .update({ is_cancelled: true })
       .eq('user_id', state.userId)
       .eq('id', entry.id);
+
+    await supabase.from('tracker_user_stats').update({
+      my_weekly_debt: newWeeklyDebt,
+      my_total_debt: newTotalDebt
+    }).eq('user_id', state.userId);
   },
   
   adjustDebt: async (type: 'WEEKLY' | 'TOTAL', newAmount: number) => {
@@ -827,12 +837,18 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     });
 
     await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
       user_id: state.userId,
       rule_id: rule_id,
       timestamp: timestamp,
       points_applied: 0,
       debt_applied: debtDiff,
     });
+
+    await supabase.from('tracker_user_stats').update({
+      my_weekly_debt: isWeekly ? newAmount : state.myWeeklyDebt,
+      my_total_debt: !isWeekly ? newAmount : state.myTotalDebt
+    }).eq('user_id', state.userId);
   },
 
   adjustPoints: async (newAmount: number) => {
