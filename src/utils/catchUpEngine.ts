@@ -69,6 +69,7 @@ export const runCatchUpEngine = async (state: any, set: any) => {
     
     let totalPoints = 5; // Base breathing tax is always applied
     let hasDailyDebt = false;
+    let hasDraw = false;
     
     if (actions && actions.length > 0) {
        for (const a of actions) {
@@ -79,11 +80,12 @@ export const runCatchUpEngine = async (state: any, set: any) => {
                    totalPoints += a.points_applied;
                }
                if (a.rule_id === 'daily_debt_settlement') hasDailyDebt = true;
+               if (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') hasDraw = true;
            }
        }
     }
     
-    return { start, actions: actions || [], totalPoints, hasDailyDebt };
+    return { start, actions: actions || [], totalPoints, hasDailyDebt, hasDraw };
   };
 
   let allInserts: any[] = [];
@@ -138,7 +140,10 @@ export const runCatchUpEngine = async (state: any, set: any) => {
          if (myNeedsProcessing && !myData.hasDailyDebt) uidsToProcessDailyDebt.push(state.userId);
          if (oppNeedsProcessing && state.opponentUserId && !oppData!.hasDailyDebt) uidsToProcessDailyDebt.push(state.opponentUserId);
 
-         if (uidsToProcessDailyDebt.length > 0 && oppData && !ctx[state.userId].isExempt) {
+         const isDrawDay = myData.hasDraw && oppData && oppData.hasDraw;
+         const isDayExempt = isDrawDay || ctx[state.userId].isExempt;
+
+         if (uidsToProcessDailyDebt.length > 0 && oppData && !isDayExempt) {
              let myComputed = Math.max(0, myData.totalPoints);
              let oppComputed = Math.max(0, oppData.totalPoints);
              let diff = myComputed - oppComputed;
@@ -183,9 +188,6 @@ export const runCatchUpEngine = async (state: any, set: any) => {
   if (myDate !== state.lastSettlementDate) {
       updatesMe = {
           last_settlement_date: todayStr,
-          my_points: 5,
-          my_debt: ctx[state.userId].debt,
-          my_total_debt: ctx[state.userId].debt,
           my_weekly_debt: ctx[state.userId].weekly,
           unpaid_weekly_debt: ctx[state.userId].unpaid,
           last_weekly_reset_date: ctx[state.userId].lastReset,
@@ -197,9 +199,6 @@ export const runCatchUpEngine = async (state: any, set: any) => {
   if (state.opponentUserId && oppDate !== state.opponentLastSettlementDate) {
       updatesOpp = {
           last_settlement_date: todayStr,
-          my_points: 5,
-          my_debt: ctx[state.opponentUserId].debt,
-          my_total_debt: ctx[state.opponentUserId].debt,
           my_weekly_debt: ctx[state.opponentUserId].weekly,
           unpaid_weekly_debt: ctx[state.opponentUserId].unpaid,
           last_weekly_reset_date: ctx[state.opponentUserId].lastReset,
