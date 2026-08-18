@@ -68,7 +68,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
         <NavLink to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
           <LayoutDashboard size={24} />
           <span>Dashboard</span>
