@@ -328,6 +328,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
             opponentLastGmDate: payload.new.last_gm_date,
           });
         }
+        
+        // Recalculate GMs if any exemption might have changed
+        const state = get();
+        state.recalculateTodayGms().catch(console.error);
       })
       .subscribe((status) => {
         set({ isOnline: status === 'SUBSCRIBED' });
@@ -347,9 +351,9 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tracker_action_entries' }, (payload) => {
         const state = get();
         if (payload.new.user_id === userId) {
-          set({ actionEntries: state.actionEntries.map(e => e.timestamp === payload.new.timestamp ? payload.new as ActionEntry : e) });
+          set({ actionEntries: state.actionEntries.map(e => e.id === payload.new.id ? payload.new as ActionEntry : e) });
         } else {
-          set({ opponentActionEntries: state.opponentActionEntries.map(e => e.timestamp === payload.new.timestamp ? payload.new as ActionEntry : e) });
+          set({ opponentActionEntries: state.opponentActionEntries.map(e => e.id === payload.new.id ? payload.new as ActionEntry : e) });
         }
       })
       .subscribe();
@@ -1096,6 +1100,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
            const newPoints = state.myPoints + diff;
            
            await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', myGmId);
+           await supabase.from('tracker_user_stats').update({ my_points: newPoints }).eq('user_id', state.userId);
            
            set({
                myPoints: newPoints,
@@ -1124,6 +1129,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
            const newPoints = state.opponentPoints + diff;
            
            await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', oppGmId);
+           await supabase.from('tracker_user_stats').update({ my_points: newPoints }).eq('user_id', state.opponentUserId);
            
            set({
                opponentPoints: newPoints,
