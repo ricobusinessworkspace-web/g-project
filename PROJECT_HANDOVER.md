@@ -1,48 +1,62 @@
-# Project Handover: G-Project Tracker
+# G-Project: Handover Document
 
-## Overview
-The G-Project Tracker is a React-based Progressive Web App (PWA) built with Vite and TypeScript. It is a dual-player habit, penalty, and debt tracking application designed to be extremely fast, offline-capable (via state persistence), and aggressively synchronized via Supabase Realtime. 
+Dieses Dokument dient als umfassende Übergabe für das G-Project. Es beschreibt die Architektur, die Kernmechanismen, die Datenbankstruktur und die wichtigsten (kürzlich behobenen) Besonderheiten des Systems, damit zukünftige Entwickler (oder KI-Agenten) nahtlos weiterarbeiten können.
 
-## Tech Stack
-- **Frontend**: React, TypeScript, Vite
-- **State Management**: Zustand (with `persist` middleware for local storage caching)
-- **Database / Backend**: Supabase (PostgreSQL, Realtime, REST API)
-- **Styling**: Vanilla CSS (`index.css`) utilizing modern glassmorphism, CSS variables for theming, and an Apple-like minimalist aesthetic.
-- **Deployment**: Vercel (Auto-deploys from the `main` branch)
+## 1. Tech-Stack
+*   **Frontend:** React, TypeScript, Vite
+*   **State Management:** Zustand (`src/store/trackerStore.ts`)
+*   **Backend / Database:** Supabase (PostgreSQL)
+*   **Deployment:** Vercel (Auto-Deploy vom `main`-Branch)
 
-## Architecture & Data Flow
-The app relies on a heavy-client architecture where complex logic (like catching up on missed days) is calculated client-side upon app load, before state is pushed back to Supabase.
+## 2. Architektur & Paradigmen
 
-### Supabase Schema
-The database consists of three main tables:
-1. `tracker_user_profiles`: Stores static user information (name, id).
-2. `tracker_user_stats`: Stores current state balances (e.g., `my_points`, `my_debt`, `my_weekly_debt`, `my_total_debt`, `unpaid_weekly_debt`, and last-action timestamps).
-3. `tracker_action_entries`: An append-only ledger for every action logged (points added, debt added). Acts as the single source of truth for the "History Feed".
+### Event Sourcing (Das Ledger-Prinzip)
+Die App basiert auf einem Single-Source-of-Truth-Prinzip. Anstatt den Punktestand einfach stumm zu überschreiben, wird **jede Aktion** (Punkte, Strafen, Resets) als separates Event in der Tabelle `tracker_action_entries` geloggt. 
+*   **Vorteil:** Die Historie ist lückenlos nachvollziehbar. Die Gesamtschulden (`my_debt` / `my_total_debt`) und Punkte (`my_points`) ergeben sich rechnerisch aus der Summe dieser Events.
 
-### Zustand Store (`trackerStore.ts`)
-This is the core engine of the app. It handles:
-- **`fetchState`**: Grabs the initial state and all actions from the current month.
-- **`logAction`**: Logs an action locally, updates the debt/point balances, and pushes to Supabase.
-  - *Debt Spillover Logic*: Negative `myWeeklyDebt` automatically spills over to `myTotalDebt` at the end of the week (handled by Catch-Up Engine). Manual debt payoffs (`ab_3`) exclusively target `myTotalDebt`.
-- **`setupRealtimeSync`**: Listens to Supabase `postgres_changes` to instantly reflect the opponent's actions or status changes.
+### Der Datenbank-Trigger (Race-Condition-Schutz)
+Damit bei gleichzeitigem Drücken von Buttons (z.B. schnelles Hinzufügen von Strafen) keine veralteten Werte in die Datenbank geschrieben werden, kümmert sich ein serverseitiger PostgreSQL-Trigger um die exakte Berechnung von `my_debt` und `my_points`.
+*   **Name:** `trigger_recalculate_user_stats`
+*   **Funktion:** Feuert nach jedem `INSERT`, `UPDATE` oder `DELETE` in `tracker_action_entries`.
+*   **Ausnahme:** Er ignoriert Events mit `rule_id = 'weekly_reset'`, da der wöchentliche Reset Schulden nur in den "Unpaid Bucket" verschiebt, das absolute Total Debt des Accounts aber in diesem Moment **nicht** ändert.
 
-### Catch-Up Engine (`utils/catchUpEngine.ts`)
-Because users might not open the app every day, the Catch-Up Engine runs on boot (via `checkAndRunSettlement`). It simulates the passage of time since the user's `lastSettlementDate`.
-- It dynamically retroactively applies the 5-point daily decay (`daily_tax`).
-- It applies the Sleep Tax (if a user didn't log their "Good Morning" in time).
-- It executes the **Weekly Reset** on Mondays (moving positive `myWeeklyDebt` to `unpaid_weekly_debt`, or applying negative `myWeeklyDebt` against the `myTotalDebt`).
-- It processes Late Fees for unpaid debt.
+## 3. Kern-Systeme & Workflows
 
-## UI / UX Design
-The UI follows a strict, minimalist "Apple-like" premium design.
-- We recently removed all clunky borders and heavy card backgrounds in favor of transparent dividers and flat glassmorphism (`.glass`).
-- `react-hot-toast` is used for non-intrusive bottom-center notifications.
-- `navigator.vibrate` is heavily utilized to provide haptic feedback upon logging actions.
+### A. Die Catch-Up Engine (`src/utils/catchUpEngine.ts`)
+Das Herzstück der App. Sie läuft automatisch beim App-Start (`fetchState`).
+*   **Aufgabe:** Simuliert die Zeit, die vergangen ist, seit der Nutzer die App zuletzt offen hatte.
+*   **Daily Debt (Tägliche Steuern):** Berechnet um 04:00 Uhr morgens die Punkte-Differenz zwischen dir und dem Gegner und teilt dem Verlierer die Schulden (5€, 10€ oder 15€) zu. 
+*   **Weekly Reset (Montags-Abrechnung):** Jeden Montag wird das `Weekly Debt` auf 0 gesetzt.
+    *   **Positives Weekly Debt:** Wandert in den `Unpaid Bucket` (`unpaid_weekly_debt`). Von dort muss es manuell per Button bezahlt werden.
+    *   **Negatives Weekly Debt (Spillover):** Wenn ein Nutzer in der Woche Überschuss erwirtschaftet (z.B. -15€), reduziert das sein *Total Debt*. Die Engine erstellt dafür ein Event namens `weekly_spillover`, welches vom DB-Trigger erfasst wird und das Total Debt permanent reduziert.
 
-## Deployment Workflow
-- The app is deployed on Vercel. 
-- **Rule of Thumb**: Do not test locally with `npm run dev` unless necessary. Commit and push directly to `main` via `git add . && git commit -m "..." && git push origin main` so Vercel can auto-deploy the changes for both users immediately.
+### B. TrackerStore (`src/store/trackerStore.ts`)
+Verwaltet den gesamten lokalen State und die Kommunikation mit Supabase.
+*   **Achtung:** Während das *Total Debt* über den DB-Trigger errechnet wird, werden **`my_weekly_debt` und `my_total_debt` direkt im Store** auf Stand gehalten und bei jedem `logAction` manuell via `UPDATE` in die Tabelle `tracker_user_stats` gepusht. (Dies war wichtig, da ein Trigger diese Werte aufgrund der komplexen Reset-Logik nicht einfach per SUM() errechnen kann).
 
-## Known Gotchas
-- **In-App Browsers**: The app struggles with session persistence inside Instagram/WhatsApp in-app browsers. Users must use "Add to Homescreen" (PWA mode) for SSO-like persistence.
-- **Client-Side Engine**: The `catchUpEngine` assumes at least one user opens the app to trigger settlements. If neither user opens the app for a month, the engine will loop through all missed days upon the next open. Ensure the while-loop in `catchUpEngine.ts` remains highly optimized to prevent browser lock-ups.
+### C. Time Machine (Retroaktives Editieren)
+*   **Zweck:** Nutzer können vergangene Tage anwählen (`selectedDate` im Store) und Aktionen nachtragen.
+*   **Umsetzung:** Die Funktion `logAction` nutzt nicht `Date.now()`, sondern den Timestamp des ausgewählten Datums. Die UI in `Dashboard.tsx` ändert sich, um Aktionen des vergangenen Tages statt des aktuellen anzuzeigen.
+
+### D. "Ciad" / Remis-System
+*   **Zweck:** Beide Spieler können einen Waffenstillstand (0€ Daily Tax) für den Tag vereinbaren.
+*   **Umsetzung:** Spieler A triggert ein `draw_request` Event. Spieler B triggert ein `draw_accept` Event. Die Catch-Up Engine prüft auf das Vorhandensein beider Events für den spezifischen Tag und markiert den Tag intern als `isExempt = true`.
+
+## 4. Kürzliche Bugfixes & Fallstricke (Wichtig!)
+
+1.  **Der Weekly Spillover Bug:**
+    *   *Problem:* Negatives Weekly Debt (z.B. -15€) wurde beim Montags-Reset zwar intern verbucht, aber der DB-Trigger ignorierte es (da er Reset-Events filtert). Nach einem App-Refresh war das Total Debt wieder falsch.
+    *   *Lösung:* Die Catch-Up Engine erstellt bei negativem Weekly Debt nun ein **`weekly_spillover`**-Event. Dieses wird vom Trigger mitgerechnet und reduziert das Total Debt permanent.
+2.  **Der Unpaid-Bucket-Transfer Bug:**
+    *   *Problem:* Wenn man am Wochenende Schulden machte, wurde das `Weekly Debt` am Montag auf 0 gesetzt, wanderte aber nicht in den Unpaid Bucket. Die alten Schulden wuchsen einfach in die nächste Woche weiter.
+    *   *Lösung:* `logAction` speichert nun `my_weekly_debt` bei jeder Aktion wieder verlässlich in der `tracker_user_stats`-Tabelle. So hat die Catch-Up Engine am Montag immer den topaktuellen Wert zur Hand, um ihn in den Unpaid Bucket zu transferieren.
+
+## 5. Deployment / Arbeitsprozess
+*   **Vercel Auto-Deploy:** Keine lokalen Builds pushen (z.B. in Ordner wie `dist`). Jeder Push auf den `main`-Branch (`git add . && git commit -m "..." && git push origin main`) triggert sofort den Live-Build auf Vercel.
+*   **Dev-Server:** Lokal testen mit `npm run dev` (Vite).
+*   **Styles:** Pures Vanilla CSS. Keine Tailwind-Klassen nutzen. UI soll hochwertig und flüssig (Animations) wirken.
+
+## 6. Datenbank Tabellen (Zusammenfassung)
+1.  **`tracker_action_entries`**: Das Ledger. Speichert jeden Klick, jedes Event (Spillover, Remis, Strafen, Punkte).
+2.  **`tracker_user_stats`**: Aggregierte State-Tabelle (beinhaltet `my_points`, `my_debt`, `my_weekly_debt`, `unpaid_weekly_debt`, `last_settlement_date` etc.).
+3.  **`tracker_rules`**: Definition der Buttons/Aktionen.

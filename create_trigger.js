@@ -10,24 +10,14 @@ async function run() {
     CREATE OR REPLACE FUNCTION recalculate_user_stats()
     RETURNS TRIGGER AS $$
     BEGIN
-      -- Recalculate my_points for the user
+      -- Recalculate my_total_debt for the user (ignoring weekly_reset and adj_weekly)
       UPDATE tracker_user_stats
-      SET my_points = (
-          SELECT COALESCE(SUM(points_applied), 0)
-          FROM tracker_action_entries
-          WHERE user_id = COALESCE(NEW.user_id, OLD.user_id)
-            AND is_cancelled = false
-      )
-      WHERE user_id = COALESCE(NEW.user_id, OLD.user_id);
-      
-      -- Recalculate my_debt for the user
-      UPDATE tracker_user_stats
-      SET my_debt = (
+      SET my_total_debt = (
           SELECT COALESCE(SUM(debt_applied), 0)
           FROM tracker_action_entries
           WHERE user_id = COALESCE(NEW.user_id, OLD.user_id)
             AND is_cancelled = false
-            AND rule_id != 'weekly_reset'
+            AND rule_id NOT IN ('weekly_reset', 'adj_weekly')
       )
       WHERE user_id = COALESCE(NEW.user_id, OLD.user_id);
 

@@ -210,7 +210,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (data) {
       set({
         myPoints: data.my_points ?? 5,
-        myDebt: data.my_debt ?? 0,
+        myDebt: data.my_total_debt ?? 0,
         myWeeklyDebt: data.my_weekly_debt ?? 0,
         myTotalDebt: data.my_total_debt ?? 0,
         myUnpaidWeeklyDebt: data.unpaid_weekly_debt ?? 0,
@@ -299,7 +299,7 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
         if (payload.new.user_id === userId) {
           set({
             myPoints: payload.new.my_points ?? 5,
-            myDebt: payload.new.my_debt ?? 0,
+            myDebt: payload.new.my_total_debt ?? 0,
             myWeeklyDebt: payload.new.my_weekly_debt ?? 0,
             myTotalDebt: payload.new.my_total_debt ?? 0,
             myUnpaidWeeklyDebt: payload.new.unpaid_weekly_debt ?? 0,
@@ -741,8 +741,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       newWeeklyDebt += debtToApply;
     }
 
+    const newPoints = get().myPoints + pointsToApply;
+
     set({
-      myPoints: get().myPoints + pointsToApply,
+      myPoints: newPoints,
       myDebt: get().myDebt + debtToApply,
       myWeeklyDebt: newWeeklyDebt,
       myTotalDebt: newTotalDebt,
@@ -761,7 +763,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     await supabase.from('tracker_user_stats').update({
       my_weekly_debt: newWeeklyDebt,
-      my_total_debt: newTotalDebt
+      my_total_debt: newTotalDebt,
+      my_points: newPoints
     }).eq('user_id', state.userId);
   },
   
@@ -787,8 +790,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     const isGm = entry.rule_id?.startsWith('gm_');
     const pointsToSubtract = isGm ? entry.points_applied - 5 : entry.points_applied;
 
+    const newPoints = get().myPoints - pointsToSubtract;
+
     set({
-      myPoints: get().myPoints - pointsToSubtract,
+      myPoints: newPoints,
       myDebt: get().myDebt - entry.debt_applied,
       myWeeklyDebt: newWeeklyDebt,
       myTotalDebt: newTotalDebt,
@@ -804,7 +809,8 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     await supabase.from('tracker_user_stats').update({
       my_weekly_debt: newWeeklyDebt,
-      my_total_debt: newTotalDebt
+      my_total_debt: newTotalDebt,
+      my_points: newPoints
     }).eq('user_id', state.userId);
   },
   
