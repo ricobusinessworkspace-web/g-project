@@ -152,8 +152,8 @@ interface TrackerState {
   
   recalculateTodayGms: () => Promise<void>;
   checkAndRunSettlement: () => Promise<void>;
-  logGm: (wakeTime: Date) => void;
-  updateGm: (wakeTime: Date) => void;
+  logGm: (wakeTime: Date, forcedLogicalDay?: string) => void;
+  updateGm: (wakeTime: Date, forcedLogicalDay?: string) => void;
   resetGm: () => void;
   setOpponentPoints: (points: number) => void;
   setSelectedDate: (date: string | null) => void;

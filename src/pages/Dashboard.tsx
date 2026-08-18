@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Undo2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Undo2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import ActionCard from '../components/ActionCard';
 import { useTrackerStore, getLogicalDate, getISODate } from '../store/trackerStore';
 
@@ -50,6 +50,69 @@ export default function Dashboard() {
   const hasGmForDate = actionEntries.some(a => !a.is_cancelled && a.id === 'gm_' + effectiveDateStr + '_' + userId);
   const needsGm = !hasGmForDate && (!isToday || now.getHours() >= 4);
 
+  // --- Day Navigator helpers ---
+  const navigateDay = (direction: -1 | 1) => {
+    const todayStr = getLogicalDate(now);
+    const currentDate = new Date(effectiveDateStr + 'T12:00:00');
+    currentDate.setDate(currentDate.getDate() + direction);
+    const newDateStr = currentDate.toISOString().slice(0, 10);
+
+    // Don't go beyond today
+    if (newDateStr >= todayStr) {
+      setSelectedDate(null);
+      return;
+    }
+
+    // Don't go back more than 14 days
+    const todayDate = new Date(todayStr + 'T12:00:00');
+    const minDate = new Date(todayDate);
+    minDate.setDate(minDate.getDate() - 14);
+    const minDateStr = minDate.toISOString().slice(0, 10);
+    if (newDateStr < minDateStr) return;
+
+    setSelectedDate(newDateStr);
+  };
+
+  const canGoBack = (() => {
+    const todayDate = new Date(getLogicalDate(now) + 'T12:00:00');
+    const minDate = new Date(todayDate);
+    minDate.setDate(minDate.getDate() - 14);
+    const minDateStr = minDate.toISOString().slice(0, 10);
+    return effectiveDateStr > minDateStr;
+  })();
+
+  const canGoForward = !isToday;
+
+  const dayNavigatorLabel = (() => {
+    if (isToday) return 'Today';
+    const d = new Date(effectiveDateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  })();
+
+  // --- End-of-day points for past dates ---
+  const displayPoints = (() => {
+    if (isToday) return myPoints;
+    // Sum all points_applied for non-cancelled entries on the selected day
+    const dayStart = new Date(effectiveDateStr + 'T00:00:00').getTime();
+    const dayEnd = dayStart + 86400000;
+    const dayEntries = actionEntries.filter(
+      a => !a.is_cancelled && a.timestamp >= dayStart && a.timestamp < dayEnd
+    );
+    let total = 5; // base GM points
+    for (const entry of dayEntries) {
+      total += entry.points_applied;
+    }
+    return total;
+  })();
+
+  // --- Log title for the history feed ---
+  const logTitle = (() => {
+    if (isToday) return "Today's Log";
+    const d = new Date(effectiveDateStr + 'T12:00:00');
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+    return `${dayName}'s Log`;
+  })();
+
   if (isLoading) {
     return (
       <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -59,7 +122,7 @@ export default function Dashboard() {
     );
   }
 
-  if (needsGm) {
+  if (isToday && needsGm) {
     return (
       <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '32px' }}>
         <h2 style={{ color: 'white', fontSize: '2.5rem', fontWeight: '800', margin: 0 }}>Good Morning</h2>
@@ -164,7 +227,7 @@ export default function Dashboard() {
   const resetTimestamp = lastWeeklyResetDate ? new Date(lastWeeklyResetDate).getTime() : 0;
   const weeklyDebtBreakdown = actionEntries
     .filter(a => !a.is_cancelled && a.timestamp > resetTimestamp && a.debt_applied !== 0)
-    .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee')
+    .filter(a => a.rule_id !== 'weekly_reset' && a.rule_id !== 'adj_total' && a.rule_id !== 'late_fee' && a.rule_id !== 'weekly_spillover')
     .sort((a, b) => b.timestamp - a.timestamp);
 
   const groupedHistory: any[] = [];
@@ -244,24 +307,70 @@ export default function Dashboard() {
     <div className="container">
       <Toaster position="bottom-center" />
 
-      {/* Date Picker & Draw Controls */}
+      {/* Day Navigator & Draw Controls */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', gap: '12px' }}>
-        <input 
-          type="date" 
-          value={selectedDate || ''} 
-          onChange={(e) => setSelectedDate(e.target.value || null)}
-          style={{
-            background: 'rgba(255,255,255,0.1)',
-            border: 'none',
-            color: 'white',
-            padding: '8px 16px',
-            borderRadius: '20px',
-            fontFamily: 'inherit',
-            fontSize: '0.9rem',
-            outline: 'none'
-          }}
-        />
-        {(() => {
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            onClick={() => navigateDay(-1)}
+            disabled={!canGoBack}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: canGoBack ? 'var(--text-primary)' : 'rgba(255,255,255,0.15)',
+              cursor: canGoBack ? 'pointer' : 'default',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'opacity 0.2s ease',
+            }}
+          >
+            <ChevronLeft size={22} />
+          </button>
+          
+          <button
+            onClick={() => setSelectedDate(null)}
+            style={{
+              background: isToday ? 'var(--accent-color)' : 'rgba(255,255,255,0.1)',
+              color: 'white',
+              border: 'none',
+              padding: '8px 20px',
+              borderRadius: '20px',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              minWidth: '120px',
+              transition: 'background 0.2s ease',
+            }}
+          >
+            {dayNavigatorLabel}
+          </button>
+          
+          <button
+            onClick={() => navigateDay(1)}
+            disabled={!canGoForward}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: canGoForward ? 'var(--text-primary)' : 'rgba(255,255,255,0.15)',
+              cursor: canGoForward ? 'pointer' : 'default',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'opacity 0.2s ease',
+              visibility: canGoForward ? 'visible' : 'hidden',
+            }}
+          >
+            <ChevronRight size={22} />
+          </button>
+        </div>
+
+        {/* Draw controls — only show on today */}
+        {isToday && (() => {
           const isDrawDay = 
             actionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_accept' || a.rule_id === 'draw_request') && getISODate(new Date(a.timestamp)) === effectiveDateStr) &&
             opponentActionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_accept' || a.rule_id === 'draw_request') && getISODate(new Date(a.timestamp)) === effectiveDateStr);
@@ -285,7 +394,7 @@ export default function Dashboard() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '10px', marginBottom: '60px' }}>
         <div className="section-title">Account</div>
         <div className="tabular-nums" style={{ fontSize: '130px', letterSpacing: '-6px', margin: '10px 0', lineHeight: '1' }}>
-          {myPoints}
+          {displayPoints}
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px 16px', borderRadius: '20px' }}>
@@ -342,7 +451,7 @@ export default function Dashboard() {
       {/* History Feed */}
       <div style={{ width: '100%', marginBottom: '40px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Today's Log</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{logTitle}</div>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '4px' }}>
             <button onClick={() => setHistoryFilter('all')} style={{ background: historyFilter === 'all' ? 'var(--accent-color)' : 'transparent', color: historyFilter === 'all' ? 'white' : 'var(--text-secondary)', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}>All</button>
             <button onClick={() => setHistoryFilter('me')} style={{ background: historyFilter === 'me' ? 'var(--accent-color)' : 'transparent', color: historyFilter === 'me' ? 'white' : 'var(--text-secondary)', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}>You</button>

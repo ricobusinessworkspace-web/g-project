@@ -98,17 +98,10 @@ export default function SettingsPage() {
 
   return (
     <div className="container">
-      {/* PROFILE & STATUS */}
+      {/* 1. PROFIL */}
       <div style={{ marginBottom: '32px' }}>
-        <div className="section-title">PROFILE & STATUS</div>
+        <div className="section-title">PROFIL</div>
         <div className="card-list">
-          <div className="card-row">
-            <span className="card-row-label">Connection Status</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? '#34C759' : '#FF453A' }} />
-              <span className="card-row-value">{isOnline ? 'Online' : 'Offline'}</span>
-            </div>
-          </div>
           <div className="card-row">
             <span className="card-row-label">Name</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--card-border)', padding: '4px 8px', borderRadius: '8px' }} onClick={() => openEditModal('NAME', userName || '')}>
@@ -117,19 +110,119 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="card-row">
-            <span className="card-row-label">User ID</span>
-            <span className="card-row-value" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {userId || 'Not Logged In'}
-            </span>
+            <span className="card-row-label">Connection Status</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? '#34C759' : '#FF453A' }} />
+              <span className="card-row-value">{isOnline ? 'Online' : 'Offline'}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* EXEMPTIONS */}
-      <div style={{ marginBottom: '32px' }}>
-        <div className="section-title">EXEMPTIONS (EQUAL TAXATION)</div>
-        <div className="card-list">
+      {/* 2. HEUTE */}
+      {(lastGmDate === currentSimDate || !myGoofFreeDayUsed || myGoofFreeDayUsed === getISODate(new Date()) || true) && (
+        <div style={{ marginBottom: '32px' }}>
+          <div className="section-title">HEUTE</div>
+          <div className="card-list">
+            {lastGmDate === currentSimDate && (
+              <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                  <span className="card-row-label">Today's GM Time</span>
+                  {!isAdjustingGm ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span className="card-row-value">{todayGmTimeStr}</span>
+                      <button 
+                        onClick={() => setIsAdjustingGm(true)}
+                        style={{ background: 'var(--primary-color)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                      >
+                        Anpassen
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input 
+                        type="time" 
+                        className="time-input"
+                        style={{ 
+                          background: 'var(--card-border)', 
+                          color: 'white', 
+                          padding: '6px 10px', 
+                          borderRadius: '8px', 
+                          border: 'none',
+                          fontSize: '0.9rem',
+                          fontFamily: 'inherit'
+                        }}
+                        value={displayGmTime}
+                        onChange={(e) => {
+                          setLocalGmTime(e.target.value);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSaveGmTime();
+                          }
+                        }}
+                      />
+                      <button 
+                        onClick={handleSaveGmTime}
+                        style={{ background: 'var(--success-color, #4ade80)', color: '#1a1a1a', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                      >
+                        Speichern
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setLocalGmTime(null);
+                          setIsAdjustingGm(false);
+                        }}
+                        style={{ background: 'transparent', color: 'var(--text-color)', border: '1px solid var(--card-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem' }}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="card-row">
+              <span className="card-row-label">🌴 Use Goof Free Day</span>
+              <button 
+                className="modal-btn" 
+                style={{ 
+                  background: myGoofFreeDayUsed === getISODate(new Date()) ? 'var(--accent-color)' : 'var(--card-border)',
+                  padding: '8px 16px', flex: 'none', color: 'white',
+                  opacity: (myGoofFreeDayUsed && myGoofFreeDayUsed !== getISODate(new Date()) && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7)) ? 0.5 : 1,
+                  cursor: (myGoofFreeDayUsed && myGoofFreeDayUsed !== getISODate(new Date()) && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7)) ? 'not-allowed' : 'pointer'
+                }}
+                onClick={() => {
+                  const today = getISODate(new Date());
+                  const currentMonth = today.substring(0, 7);
+                  const usedMonth = myGoofFreeDayUsed ? myGoofFreeDayUsed.substring(0, 7) : null;
+                  const isUsedThisMonth = usedMonth === currentMonth && myGoofFreeDayUsed !== today;
 
+                  if (isUsedThisMonth) return;
+
+                  if (myGoofFreeDayUsed === today) {
+                    setGoofFreeDay(null);
+                  } else {
+                    setGoofFreeDay(today);
+                  }
+                }}
+              >
+                {myGoofFreeDayUsed === getISODate(new Date())
+                  ? 'Active Today' 
+                  : (myGoofFreeDayUsed && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7) 
+                      ? 'Already Used This Month' 
+                      : 'Activate for Today')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. AUSNAHMEN */}
+      <div style={{ marginBottom: '32px' }}>
+        <div className="section-title">AUSNAHMEN</div>
+        <div className="card-list">
           <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
               <span className="card-row-label">✈️ Trip Abroad (Goof Free)</span>
@@ -180,56 +273,17 @@ export default function SettingsPage() {
               </label>
             </div>
           </div>
-          <div className="card-row">
-            <span className="card-row-label">🌴 Use Goof Free Day</span>
-            <button 
-              className="modal-btn" 
-              style={{ 
-                background: myGoofFreeDayUsed === getISODate(new Date()) ? 'var(--accent-color)' : 'var(--card-border)',
-                padding: '8px 16px', flex: 'none', color: 'white',
-                opacity: (myGoofFreeDayUsed && myGoofFreeDayUsed !== getISODate(new Date()) && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7)) ? 0.5 : 1,
-                cursor: (myGoofFreeDayUsed && myGoofFreeDayUsed !== getISODate(new Date()) && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7)) ? 'not-allowed' : 'pointer'
-              }}
-              onClick={() => {
-                const today = getISODate(new Date());
-                const currentMonth = today.substring(0, 7);
-                const usedMonth = myGoofFreeDayUsed ? myGoofFreeDayUsed.substring(0, 7) : null;
-                const isUsedThisMonth = usedMonth === currentMonth && myGoofFreeDayUsed !== today;
-
-                if (isUsedThisMonth) return;
-
-                if (myGoofFreeDayUsed === today) {
-                  setGoofFreeDay(null);
-                } else {
-                  setGoofFreeDay(today);
-                }
-              }}
-            >
-              {myGoofFreeDayUsed === getISODate(new Date())
-                ? 'Active Today' 
-                : (myGoofFreeDayUsed && myGoofFreeDayUsed.substring(0, 7) === getISODate(new Date()).substring(0, 7) 
-                    ? 'Already Used This Month' 
-                    : 'Activate for Today')}
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* HIDDEN STATS */}
+      {/* 4. ANPASSUNGEN */}
       <div style={{ marginBottom: '32px' }}>
-        <div className="section-title">HIDDEN STATS (YOU)</div>
+        <div className="section-title">ANPASSUNGEN</div>
         <div className="card-list">
           <div className="card-row">
             <span className="card-row-label">Total Points</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--card-border)', padding: '4px 8px', borderRadius: '8px' }} onClick={() => openEditModal('POINTS', myPoints)}>
               <span className="card-row-value-accent" style={{ color: 'white' }}>{myPoints} pts</span>
-              <Pencil size={14} color="#8E8E93" />
-            </div>
-          </div>
-          <div className="card-row">
-            <span className="card-row-label">Total Accumulated Debt</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--card-border)', padding: '4px 8px', borderRadius: '8px' }} onClick={() => openEditModal('TOTAL', myTotalDebt)}>
-              <span className="card-row-value-accent">{myTotalDebt}€</span>
               <Pencil size={14} color="#8E8E93" />
             </div>
           </div>
@@ -240,65 +294,13 @@ export default function SettingsPage() {
               <Pencil size={14} color="#8E8E93" />
             </div>
           </div>
-          {lastGmDate === currentSimDate && (
-            <div className="card-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                <span className="card-row-label">Today's GM Time</span>
-                {!isAdjustingGm ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span className="card-row-value">{todayGmTimeStr}</span>
-                    <button 
-                      onClick={() => setIsAdjustingGm(true)}
-                      style={{ background: 'var(--primary-color)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}
-                    >
-                      Anpassen
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input 
-                      type="time" 
-                      className="time-input"
-                      style={{ 
-                        background: 'var(--card-border)', 
-                        color: 'white', 
-                        padding: '6px 10px', 
-                        borderRadius: '8px', 
-                        border: 'none',
-                        fontSize: '0.9rem',
-                        fontFamily: 'inherit'
-                      }}
-                      value={displayGmTime}
-                      onChange={(e) => {
-                        setLocalGmTime(e.target.value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSaveGmTime();
-                        }
-                      }}
-                    />
-                    <button 
-                      onClick={handleSaveGmTime}
-                      style={{ background: 'var(--success-color, #4ade80)', color: '#1a1a1a', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}
-                    >
-                      Speichern
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setLocalGmTime(null);
-                        setIsAdjustingGm(false);
-                      }}
-                      style={{ background: 'transparent', color: 'var(--text-color)', border: '1px solid var(--card-border)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem' }}
-                    >
-                      Abbrechen
-                    </button>
-                  </div>
-                )}
-              </div>
+          <div className="card-row">
+            <span className="card-row-label">Total Debt</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--card-border)', padding: '4px 8px', borderRadius: '8px' }} onClick={() => openEditModal('TOTAL', myTotalDebt)}>
+              <span className="card-row-value-accent">{myTotalDebt}€</span>
+              <Pencil size={14} color="#8E8E93" />
             </div>
-          )}
+          </div>
         </div>
 
         {myUnpaidWeeklyDebt > 0 && (
@@ -317,27 +319,21 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* OPPONENT PROFILE */}
+      {/* 5. PARTNER */}
       <div style={{ marginBottom: '32px' }}>
-        <div className="section-title">OPPONENT PROFILE</div>
+        <div className="section-title">PARTNER</div>
         <div className="card-list">
           <div className="card-row">
             <span className="card-row-label">Name</span>
             <span className="card-row-value">{opponentName || 'Opponent'}</span>
           </div>
           <div className="card-row">
-            <span className="card-row-label">User ID</span>
-            <span className="card-row-value" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {opponentUserId || 'Unknown'}
-            </span>
+            <span className="card-row-label">Weekly Debt</span>
+            <span className="card-row-value-accent">{opponentWeeklyDebt}€</span>
           </div>
           <div className="card-row">
             <span className="card-row-label">Total Debt</span>
             <span className="card-row-value-accent">{opponentTotalDebt}€</span>
-          </div>
-          <div className="card-row">
-            <span className="card-row-label">Weekly Debt</span>
-            <span className="card-row-value-accent">{opponentWeeklyDebt}€</span>
           </div>
           <div className="card-row">
             <span className="card-row-label">Last Seen (Action)</span>
@@ -346,7 +342,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* 6. KONTO */}
       <div style={{ marginBottom: '80px' }}>
+        <div className="section-title">KONTO</div>
         <button 
           style={{ width: '100%', padding: '16px', background: 'transparent', color: 'var(--error-color)', borderRadius: '12px', border: '1px solid var(--error-color)', fontWeight: 'bold', cursor: 'pointer' }}
           onClick={handleLogout}

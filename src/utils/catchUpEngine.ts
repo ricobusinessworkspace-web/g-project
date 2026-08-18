@@ -46,7 +46,7 @@ export const runCatchUpEngine = async (state: any, set: any) => {
       ctx[state.opponentUserId] = {
           unpaid: state.opponentUnpaidWeeklyDebt || 0,
           weekly: state.opponentWeeklyDebt || 0,
-          debt: 0,
+          debt: state.opponentTotalDebt || 0,
           lastReset: state.opponentLastWeeklyResetDate,
           lastLate: state.opponentLastLatePayDate,
           isExempt: ctx[state.userId].isExempt
