@@ -42,9 +42,6 @@ export default function Dashboard() {
   const [inputValue, setInputValue] = useState('');
   const [showDebtDropdown, setShowDebtDropdown] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'me' | 'mate'>('all');
-  const [pullY, setPullY] = useState(0);
-  const [isPulling, setIsPulling] = useState(false);
-  const [startY, setStartY] = useState(0);
 
   const now = new Date();
   const effectiveDateStr = selectedDate || getLogicalDate(now);
@@ -236,34 +233,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY === 0) {
-      setStartY(e.touches[0].clientY);
-      setIsPulling(true);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isPulling) return;
-    const y = e.touches[0].clientY;
-    const diff = y - startY;
-    if (diff > 0 && window.scrollY === 0) {
-      setPullY(Math.min(diff * 0.4, 60)); // max pull 60px
-    }
-  };
-
-  const handleTouchEnd = async () => {
-    if (!isPulling) return;
-    setIsPulling(false);
-    if (pullY > 50 && userId) {
-      triggerHaptic();
-      toast('Syncing data...', { icon: '🔄', style: { borderRadius: '12px', background: '#333', color: '#fff' } });
-      const { fetchState } = useTrackerStore.getState();
-      await fetchState(userId);
-    }
-    setPullY(0);
-  };
-
   const filteredHistory = groupedHistory.filter(entry => {
     if (historyFilter === 'all') return true;
     if (historyFilter === 'me') return entry.isMe;
@@ -272,13 +241,7 @@ export default function Dashboard() {
   });
 
   return (
-    <div 
-      className="container"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      style={{ transform: `translateY(${pullY}px)`, transition: isPulling ? 'none' : 'transform 0.3s cubic-bezier(0.1, 1, 0.4, 1)' }}
-    >
+    <div className="container">
       <Toaster position="bottom-center" />
 
       {/* Date Picker & Draw Controls */}

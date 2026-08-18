@@ -7,6 +7,7 @@ import RulesPage from './pages/Rules';
 import Performance from './pages/Performance';
 import { supabase } from './utils/supabase';
 import { useTrackerStore } from './store/trackerStore';
+import PullToRefresh from './components/PullToRefresh';
 
 export default function App() {
   const location = useLocation();
@@ -60,13 +61,15 @@ export default function App() {
 
   return (
     <>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/rules" element={<RulesPage />} />
-        <Route path="/performance" element={<Performance />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <PullToRefresh>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/rules" element={<RulesPage />} />
+          <Route path="/performance" element={<Performance />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </PullToRefresh>
 
       <nav className="bottom-nav" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
         <NavLink to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
