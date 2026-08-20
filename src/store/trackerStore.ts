@@ -42,7 +42,7 @@ export const getLogicalDate = (date: Date) => {
   return getISODate(date);
 };
 
-export const getRuleUsageStats = (entries: ActionEntry[], rule: Rule) => {
+export const getRuleUsageStats = (entries: ActionEntry[], rule?: Rule) => {
   let daily = 0, weekly = 0, monthly = 0;
   return { daily, weekly, monthly };
 };
@@ -225,7 +225,21 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     if (!state.userId) return;
     const todayStr = getLogicalDate(new Date());
 
-    const { data: gRule } = await supabase.from('g_rules').select('*').eq('id', rule.id).single();
+    let gRule;
+    if (rule.id === 'fallback_gm_id') {
+       // Search by name in DB if we don't have the real ID
+       const { data } = await supabase.from('g_rules').select('*').eq('system_id', 'sys_gm').maybeSingle();
+       if (!data) {
+           console.error("GM rule not found in DB! Please run the seed data SQL.");
+           return;
+       }
+       gRule = data;
+       rule.id = gRule.id; // Correct the ID so the UI rule matches the DB rule
+    } else {
+       const { data } = await supabase.from('g_rules').select('*').eq('id', rule.id).single();
+       gRule = data;
+    }
+    
     if (!gRule) return;
 
     const { data: todaysLogs } = await supabase.from('g_action_logs').select('*').eq('user_id', state.userId).eq('rule_id', rule.id).eq('date', todayStr);
@@ -265,9 +279,27 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   logGm: async (wakeTime: Date) => {
     const state = get();
     if (!state.userId) return;
-    const gmRule = state.rules.find(r => r.name.includes('GM'));
+    
+    // Fallback: If for some reason GM isn't in state.rules, we create a dummy one that evaluateAction can parse
+    let gmRule = state.rules.find(r => r.name === 'GM' || (r.category === 'MANDATORY' && r.name.includes('GM')));
+    
+    if (!gmRule) {
+       const { data } = await supabase.from('g_rules').select('*').eq('system_id', 'sys_gm').maybeSingle();
+       if (data) {
+           gmRule = { 
+               id: data.id, 
+               name: data.name, 
+               category: data.category as string, 
+               impact_type: 'POINTS', 
+               base_value: data.points, 
+               iconName: data.icon_name || 'Sun' 
+           };
+       }
+    }
+    
     if (!gmRule) return;
-    const existingGm = state.actionEntries.find(a => a.rule_id === gmRule.id);
+
+    const existingGm = state.actionEntries.find(a => a.rule_id === gmRule?.id);
     if (existingGm) await get().undoAction(existingGm.id);
     await get().logAction(gmRule, 1);
   },
