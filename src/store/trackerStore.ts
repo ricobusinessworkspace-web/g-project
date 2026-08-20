@@ -76,6 +76,10 @@ interface TrackerState {
   isLoading: boolean;
   isOnline: boolean;
   selectedDate: string | null;
+  lastGmDate: string | null;
+  opponentLastSettlementDate: string | null;
+  opponentLastGmDate: string | null;
+  lastWeeklyResetDate: string | null;
   fetchState: (userId: string) => Promise<void>;
   setupRealtimeSync: (userId: string) => void;
   fetchRules: () => Promise<void>;
@@ -141,6 +145,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
   isLoading: true,
   isOnline: false,
   selectedDate: null,
+  lastGmDate: null,
+  opponentLastSettlementDate: null,
+  opponentLastGmDate: null,
+  lastWeeklyResetDate: null,
 
   fetchState: async (userId: string) => {
     set({ isLoading: true, userId });
@@ -171,12 +179,16 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
       myPoints: myDaily ? myDaily.final_score : 5,
       userName: userStats?.name || '',
       mySicko: globalDay?.is_sick || false,
+      lastGmDate: userStats?.last_gm_date || null,
+      lastWeeklyResetDate: userStats?.last_weekly_reset_date || null,
       opponentUserId: oppStats?.user_id || null,
       opponentTotalDebt: oppStats?.my_total_debt || 0,
       opponentWeeklyDebt: oppWeekly?.[0]?.amount || 0,
       opponentPoints: oppDaily ? oppDaily.final_score : 5,
       opponentName: oppStats?.name || 'Opponent',
       opponentSicko: globalDay?.is_sick || false,
+      opponentLastSettlementDate: oppStats?.last_settlement_date || null,
+      opponentLastGmDate: oppStats?.last_gm_date || null,
       actionEntries: mapLogs(logs || [], userId),
       opponentActionEntries: mapLogs(logs || [], oppStats?.user_id || ''),
       isLoading: false
@@ -301,6 +313,12 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
 
     const existingGm = state.actionEntries.find(a => a.rule_id === gmRule?.id);
     if (existingGm) await get().undoAction(existingGm.id);
+    
+    // Also update tracker_user_stats for the dashboard UI
+    const todayStr = getLogicalDate(wakeTime);
+    await supabase.from('tracker_user_stats').update({ last_gm_date: todayStr }).eq('user_id', state.userId);
+    set({ lastGmDate: todayStr });
+    
     await get().logAction(gmRule, 1);
   },
 
