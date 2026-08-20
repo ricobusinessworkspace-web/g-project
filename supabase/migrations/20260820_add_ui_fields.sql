@@ -1,0 +1,2 @@
+ALTER TABLE g_rules ADD COLUMN icon_name TEXT DEFAULT 'Circle';
+ALTER TABLE g_rules ADD COLUMN sort_order INTEGER DEFAULT 0;

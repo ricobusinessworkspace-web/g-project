@@ -1,0 +1,1144 @@
+import { create } from 'zustand';
+import { supabase } from '../utils/supabase';
+import { CODE_OF_HONOR } from '../constants/rules';
+import { runCatchUpEngine } from '../utils/catchUpEngine';
+
+export type ImpactType = 'POINTS' | 'DEBT';
+export type TimeModifier = 'DOUBLE_BEFORE_6AM' | 'NONE';
+
+export interface Rule {
+  id: string;
+  name: string;
+  category: 'REOCCURING' | 'ONCE_DAILY' | 'SLEEP_TAXES' | 'EXERCISE' | 'RECREATIONAL' | 'BUSINESS' | 'PERSONAL' | 'MANDATORY' | 'ABBAUEN' | 'GN' | 'GM';
+  impact_type: ImpactType;
+  base_value: number;
+  iconName: string;
+  requires_input?: boolean;
+  input_step?: number;
+  description?: string;
+  time_modifier?: TimeModifier;
+  daily_max?: number;
+  weekly_max?: number;
+  free_uses_per_week?: number;
+  sort_order?: number;
+}
+
+export interface ActionEntry {
+  id: string;
+  rule_id: string;
+  timestamp: number;
+  points_applied: number;
+  debt_applied: number;
+  is_cancelled?: boolean;
+}
+
+export const getISODate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const getLogicalDate = (date: Date) => {
+  return getISODate(date);
+};
+
+export const getRuleUsageStats = (entries: ActionEntry[], rule: Rule) => {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  
+  const d = new Date(startOfDay);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const startOfWeek = new Date(d.setDate(diff)).getTime();
+  
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  let daily = 0;
+  let weekly = 0;
+  let monthly = 0;
+
+  for (const entry of entries) {
+    if (entry.rule_id === rule.id && !entry.is_cancelled) {
+      // Calculate units based on base_value. For ABBAUEN the logic is different but they don't have limits.
+      let units = 1;
+      if (rule.impact_type === 'POINTS' && rule.base_value !== 0) {
+        units = Math.abs(entry.points_applied / rule.base_value);
+      } else if (rule.impact_type === 'DEBT' && rule.base_value !== 0) {
+        units = Math.abs(entry.debt_applied / rule.base_value);
+      }
+
+      // Handle the DOUBLE_BEFORE_6AM modifier. If the entry had 2x points, it only counts as 1 use of the exercise rule physically.
+      // Actually, if we use points_applied, a 6AM exercise gives double points, but does it count as double limit? 
+      // User said: "eg -1 30min learning means only -4 points per day can be tracked". 
+      // Let's assume units = points_applied / base_value, except for 6AM exercises which have no daily_max anyway.
+      
+      if (entry.timestamp >= startOfDay) daily += units;
+      if (entry.timestamp >= startOfWeek) weekly += units;
+      if (entry.timestamp >= startOfMonth) monthly += units;
+    }
+  }
+
+  return { daily, weekly, monthly };
+};
+
+interface TrackerState {
+  userId: string | null;
+  userName: string | null;
+  myPoints: number;
+  myDebt: number; // Euro debt
+  myWeeklyDebt: number;
+  myTotalDebt: number;
+  myUnpaidWeeklyDebt: number;
+  opponentPoints: number;
+  opponentWeeklyDebt: number;
+  opponentTotalDebt: number;
+  opponentUnpaidWeeklyDebt: number;
+  opponentUserId: string | null;
+  opponentName: string | null;
+  opponentIsOnline: boolean;
+  opponentLastSettlementDate: string | null;
+  opponentLastWeeklyResetDate: string | null;
+  opponentLastLatePayDate: string | null;
+  opponentLastGmDate: string | null;
+  myTripAbroad: boolean;
+  myFamilyTrip: boolean;
+  mySicko: boolean;
+  myGoofFreeDayUsed: string | null;
+  opponentTripAbroad: boolean;
+  opponentFamilyTrip: boolean;
+  opponentSicko: boolean;
+  opponentGoofFreeDayUsed: string | null;
+  rules: Rule[];
+  actionEntries: ActionEntry[];
+  opponentActionEntries: ActionEntry[];
+  isLoading: boolean;
+  isOnline: boolean;
+  
+  selectedDate: string | null;
+
+  lastSettlementDate: string | null;
+  lastWeeklyResetDate: string | null;
+  lastGmDate: string | null;
+  lastLatePayDate: string | null;
+
+  fetchState: (userId: string) => Promise<void>;
+  setupRealtimeSync: (userId: string) => void;
+  fetchRules: () => Promise<void>;
+  addRule: (rule: Omit<Rule, 'id'>) => Promise<void>;
+  updateRule: (rule: Rule) => Promise<void>;
+  deleteRule: (ruleId: string) => Promise<void>;
+  reorderCategoryRules: (orderedIds: string[]) => Promise<void>;
+  logAction: (rule: Rule, multiplier?: number) => void;
+  undoAction: (actionId: string) => void;
+  adjustDebt: (type: 'WEEKLY' | 'TOTAL', newAmount: number) => Promise<void>;
+  adjustPoints: (newAmount: number) => Promise<void>;
+  updateName: (newName: string) => Promise<void>;
+  settleWeeklyDebt: () => Promise<void>;
+  resetDay: () => void;
+  setSharedTripAbroad: (value: boolean) => Promise<void>;
+  setSharedFamilyTrip: (value: boolean) => Promise<void>;
+  setSharedSicko: (value: boolean) => Promise<void>;
+  
+  setTripAbroad: (value: boolean) => Promise<void>;
+  setFamilyTrip: (value: boolean) => Promise<void>;
+  setSicko: (value: boolean) => Promise<void>;
+  setGoofFreeDay: (date: string | null) => Promise<void>;
+  
+  setOpponentTripAbroad: (value: boolean) => Promise<void>;
+  setOpponentFamilyTrip: (value: boolean) => Promise<void>;
+  setOpponentSicko: (value: boolean) => Promise<void>;
+  setOpponentGoofFreeDay: (date: string | null) => Promise<void>;
+  
+  recalculateTodayGms: () => Promise<void>;
+  checkAndRunSettlement: () => Promise<void>;
+  logGm: (wakeTime: Date, forcedLogicalDay?: string) => void;
+  updateGm: (wakeTime: Date, forcedLogicalDay?: string) => void;
+  resetGm: () => void;
+  setOpponentPoints: (points: number) => void;
+  setSelectedDate: (date: string | null) => void;
+  requestDraw: () => Promise<void>;
+  acceptDraw: () => Promise<void>;
+}
+
+export const useTrackerStore = create<TrackerState>((set, get) => ({
+  userId: null,
+  userName: null,
+  myPoints: 5,
+  myDebt: 0,
+  myWeeklyDebt: 0,
+  myTotalDebt: 0,
+  myUnpaidWeeklyDebt: 0,
+  opponentPoints: 7, 
+  opponentWeeklyDebt: 0,
+  opponentTotalDebt: 0,
+  opponentUnpaidWeeklyDebt: 0,
+  opponentUserId: null,
+  opponentName: null,
+  opponentIsOnline: false,
+  opponentLastSettlementDate: null,
+  opponentLastWeeklyResetDate: null,
+  opponentLastLatePayDate: null,
+  opponentLastGmDate: null,
+  myTripAbroad: false,
+  myFamilyTrip: false,
+  mySicko: false,
+  myGoofFreeDayUsed: null,
+  opponentTripAbroad: false,
+  opponentFamilyTrip: false,
+  opponentSicko: false,
+  opponentGoofFreeDayUsed: null,
+  
+  selectedDate: null,
+
+  rules: [],
+  actionEntries: [],
+  opponentActionEntries: [],
+  isLoading: true,
+  isOnline: false,
+  
+  lastSettlementDate: null,
+  lastWeeklyResetDate: null,
+  lastGmDate: null,
+  lastLatePayDate: null,
+
+  fetchState: async (userId: string) => {
+    set({ isLoading: true });
+    const { data, error } = await supabase.from('tracker_user_stats').select('*').eq('user_id', userId).maybeSingle();
+    if (error) alert('Select Error: ' + error.message);
+    
+    if (data) {
+      set({
+        myPoints: data.my_points ?? 5,
+        myDebt: data.my_total_debt ?? 0,
+        myWeeklyDebt: data.my_weekly_debt ?? 0,
+        myTotalDebt: data.my_total_debt ?? 0,
+        myUnpaidWeeklyDebt: data.unpaid_weekly_debt ?? 0,
+        lastSettlementDate: data.last_settlement_date,
+        lastWeeklyResetDate: data.last_weekly_reset_date,
+        lastGmDate: data.last_gm_date,
+        lastLatePayDate: data.last_late_pay_date,
+        userName: data.name,
+        myTripAbroad: data.trip_abroad ?? false,
+        myFamilyTrip: data.family_trip ?? false,
+        mySicko: data.sicko ?? false,
+        myGoofFreeDayUsed: data.goof_free_day_used ?? null,
+      });
+    } else {
+      const { error: insertErr } = await supabase.from('tracker_user_stats').insert({
+        user_id: userId,
+        my_points: 5,
+        my_debt: 0,
+        my_weekly_debt: 0,
+        my_total_debt: 0,
+        unpaid_weekly_debt: 0
+      });
+      if (insertErr) alert('Insert Error: ' + insertErr.message);
+      set({
+         myPoints: 5,
+         myDebt: 0,
+         myWeeklyDebt: 0,
+         myTotalDebt: 0,
+         myUnpaidWeeklyDebt: 0
+      });
+    }
+
+    const now = new Date();
+    const startOfLogicalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); 
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    
+    // Calculate todayStr exactly how getGmDate does to compare settlement dates
+    const todayStr = new Date(startOfLogicalDay).toISOString().split('T')[0];
+
+    const { data: opponentData } = await supabase.from('tracker_user_stats').select('*').neq('user_id', userId).maybeSingle();
+    if (opponentData) {
+      set({
+        opponentPoints: opponentData.my_points ?? 5,
+        opponentWeeklyDebt: opponentData.my_weekly_debt ?? 0,
+        opponentTotalDebt: opponentData.my_total_debt ?? 0,
+        opponentUnpaidWeeklyDebt: opponentData.unpaid_weekly_debt ?? 0,
+        opponentName: opponentData.name ?? 'Opponent',
+        opponentUserId: opponentData.user_id ?? null,
+        opponentTripAbroad: opponentData.trip_abroad ?? false,
+        opponentFamilyTrip: opponentData.family_trip ?? false,
+        opponentSicko: opponentData.sicko ?? false,
+        opponentGoofFreeDayUsed: opponentData.goof_free_day_used ?? null,
+        opponentLastSettlementDate: opponentData.last_settlement_date,
+        opponentLastWeeklyResetDate: opponentData.last_weekly_reset_date,
+        opponentLastLatePayDate: opponentData.last_late_pay_date,
+        opponentLastGmDate: opponentData.last_gm_date,
+      });
+    }
+
+
+    const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).getTime();
+
+    const { data: actionsData, error: actionsError } = await supabase.from('tracker_action_entries')
+      .select('*')
+      .gte('timestamp', thirtyDaysAgo);
+      
+    if (actionsError) alert('Fetch Actions Error: ' + actionsError.message);
+      
+    if (actionsData) {
+      set({
+        actionEntries: actionsData.filter(a => a.user_id === userId),
+        opponentActionEntries: actionsData.filter(a => a.user_id !== userId),
+      });
+    }
+
+    await get().checkAndRunSettlement();
+    
+    set({ isLoading: false });
+  },
+
+  setupRealtimeSync: async (userId: string) => {
+    await supabase.removeAllChannels();
+
+    supabase.channel('public:user_stats')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tracker_user_stats' }, (payload) => {
+        if (payload.new.user_id === userId) {
+          set({
+            myPoints: payload.new.my_points ?? 5,
+            myDebt: payload.new.my_total_debt ?? 0,
+            myWeeklyDebt: payload.new.my_weekly_debt ?? 0,
+            myTotalDebt: payload.new.my_total_debt ?? 0,
+            myUnpaidWeeklyDebt: payload.new.unpaid_weekly_debt ?? 0,
+            lastSettlementDate: payload.new.last_settlement_date,
+            lastWeeklyResetDate: payload.new.last_weekly_reset_date,
+            lastGmDate: payload.new.last_gm_date,
+            lastLatePayDate: payload.new.last_late_pay_date,
+            myTripAbroad: payload.new.trip_abroad ?? false,
+            myFamilyTrip: payload.new.family_trip ?? false,
+            mySicko: payload.new.sicko ?? false,
+            myGoofFreeDayUsed: payload.new.goof_free_day_used ?? null,
+          });
+        } else {
+          set({
+            opponentPoints: payload.new.my_points ?? 5,
+            opponentWeeklyDebt: payload.new.my_weekly_debt ?? 0,
+            opponentTotalDebt: payload.new.my_total_debt ?? 0,
+            opponentUnpaidWeeklyDebt: payload.new.unpaid_weekly_debt ?? 0,
+            opponentName: payload.new.name ?? 'Opponent',
+            opponentUserId: payload.new.user_id ?? null,
+            opponentTripAbroad: payload.new.trip_abroad ?? false,
+            opponentFamilyTrip: payload.new.family_trip ?? false,
+            opponentSicko: payload.new.sicko ?? false,
+            opponentGoofFreeDayUsed: payload.new.goof_free_day_used ?? null,
+            opponentLastSettlementDate: payload.new.last_settlement_date,
+            opponentLastGmDate: payload.new.last_gm_date,
+          });
+        }
+        
+        // Recalculate GMs if any exemption might have changed
+        const state = get();
+        state.recalculateTodayGms().catch(console.error);
+      })
+      .subscribe((status) => {
+        set({ isOnline: status === 'SUBSCRIBED' });
+      });
+
+    supabase.channel('public:action_entries')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tracker_action_entries' }, (payload) => {
+        const state = get();
+        if (payload.new.user_id === userId) {
+          if (!state.actionEntries.find(e => e.timestamp === payload.new.timestamp)) {
+             set({ actionEntries: [...state.actionEntries, payload.new as ActionEntry] });
+          }
+        } else {
+          set({ opponentActionEntries: [...state.opponentActionEntries, payload.new as ActionEntry] });
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tracker_action_entries' }, (payload) => {
+        const state = get();
+        if (payload.new.user_id === userId) {
+          set({ actionEntries: state.actionEntries.map(e => e.id === payload.new.id ? payload.new as ActionEntry : e) });
+        } else {
+          set({ opponentActionEntries: state.opponentActionEntries.map(e => e.id === payload.new.id ? payload.new as ActionEntry : e) });
+        }
+      })
+      .subscribe();
+
+    // Realtime sync for rules changes (so both players see edits immediately)
+    supabase.channel('public:tracker_rules')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tracker_rules' }, () => {
+        // On any change to rules, re-fetch the full list to keep it clean
+        get().fetchRules();
+      })
+      .subscribe();
+
+    const roomOne = supabase.channel('online-users');
+    roomOne.on('presence', { event: 'sync' }, () => {
+      const state = get();
+      const newState = roomOne.presenceState();
+      let oppIsOnline = false;
+      for (const [key, value] of Object.entries(newState)) {
+        // @ts-ignore
+        if (value.some(v => v.user_id === state.opponentUserId)) {
+          oppIsOnline = true;
+          break;
+        }
+      }
+      set({ opponentIsOnline: oppIsOnline });
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await roomOne.track({
+          user_id: userId,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+  },
+
+  setOpponentPoints: (points: number) => set({ opponentPoints: points }),
+  
+  fetchRules: async () => {
+    // Try to load rules from the database
+    const { data, error } = await supabase.from('tracker_rules').select('*').order('created_at');
+    
+    if (error) {
+      // Table doesn't exist or other error - fall back to static rules
+      console.warn('Could not load rules from DB, using static fallback:', error.message);
+      set({ rules: CODE_OF_HONOR });
+      return;
+    }
+
+    if (data && data.length > 0) {
+      // Map DB columns (snake_case) to app format (camelCase)
+      const mapped: Rule[] = data.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        impact_type: r.impact_type,
+        base_value: r.base_value,
+        iconName: r.icon_name || 'Circle',
+        requires_input: r.requires_input || false,
+        input_step: r.input_step || undefined,
+        description: r.description || undefined,
+        time_modifier: r.time_modifier || undefined,
+        daily_max: r.daily_max || undefined,
+        weekly_max: r.weekly_max || undefined,
+        free_uses_per_week: r.free_uses_per_week || undefined,
+        sort_order: r.sort_order || 0,
+      }));
+      // Explicitly sort by sort_order, then by id as fallback
+      mapped.sort((a, b) => {
+        if (a.sort_order !== b.sort_order) return (a.sort_order || 0) - (b.sort_order || 0);
+        return a.id.localeCompare(b.id);
+      });
+      set({ rules: mapped });
+    } else {
+      // DB table is empty — auto-seed from static CODE_OF_HONOR
+      console.log('tracker_rules table is empty, seeding with CODE_OF_HONOR...');
+      const dbRows = CODE_OF_HONOR.map((r, index) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        impact_type: r.impact_type,
+        base_value: r.base_value,
+        icon_name: r.iconName,
+        requires_input: r.requires_input || false,
+        input_step: r.input_step || null,
+        description: r.description || null,
+        time_modifier: r.time_modifier || null,
+        daily_max: r.daily_max || null,
+        weekly_max: r.weekly_max || null,
+        free_uses_per_week: r.free_uses_per_week || null,
+        sort_order: index,
+      }));
+      const { error: seedErr } = await supabase.from('tracker_rules').insert(dbRows);
+      if (seedErr) {
+        console.error('Failed to seed rules:', seedErr.message);
+      }
+      set({ rules: CODE_OF_HONOR.map((r, index) => ({ ...r, sort_order: index })) });
+    }
+  },
+
+  addRule: async (ruleData: Omit<Rule, 'id'>) => {
+    const id = `custom_${Date.now()}`;
+    // Put new rule at the bottom of its category
+    const state = get();
+    const categoryRules = state.rules.filter(r => r.category === ruleData.category);
+    const maxSort = categoryRules.length > 0 ? Math.max(...categoryRules.map(r => r.sort_order || 0)) : 0;
+    const sort_order = maxSort + 1;
+    
+    const newRule: Rule = { ...ruleData, id, sort_order };
+    
+    const { error } = await supabase.from('tracker_rules').insert({
+      id,
+      name: newRule.name,
+      category: newRule.category,
+      impact_type: newRule.impact_type,
+      base_value: newRule.base_value,
+      icon_name: newRule.iconName,
+      requires_input: newRule.requires_input || false,
+      input_step: newRule.input_step || null,
+      description: newRule.description || null,
+      time_modifier: newRule.time_modifier || null,
+      daily_max: newRule.daily_max || null,
+      weekly_max: newRule.weekly_max || null,
+      free_uses_per_week: newRule.free_uses_per_week || null,
+      sort_order: sort_order,
+    });
+    
+    if (error) {
+      alert('Failed to add rule: ' + error.message);
+      return;
+    }
+    
+    // Refresh to get actual order
+    await get().fetchRules();
+  },
+
+  updateRule: async (rule: Rule) => {
+    const { error } = await supabase.from('tracker_rules').update({
+      name: rule.name,
+      category: rule.category,
+      impact_type: rule.impact_type,
+      base_value: rule.base_value,
+      icon_name: rule.iconName,
+      requires_input: rule.requires_input || false,
+      input_step: rule.input_step || null,
+      description: rule.description || null,
+      time_modifier: rule.time_modifier || null,
+      daily_max: rule.daily_max || null,
+      weekly_max: rule.weekly_max || null,
+      free_uses_per_week: rule.free_uses_per_week || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', rule.id);
+    
+    if (error) {
+      alert('Failed to update rule: ' + error.message);
+      return;
+    }
+    
+    // Optimistic update
+    set({ rules: get().rules.map(r => r.id === rule.id ? rule : r) });
+  },
+
+  deleteRule: async (ruleId: string) => {
+    const { error } = await supabase.from('tracker_rules').delete().eq('id', ruleId);
+    
+    if (error) {
+      alert('Failed to delete rule: ' + error.message);
+      return;
+    }
+    
+    // Optimistic update
+    set({ rules: get().rules.filter(r => r.id !== ruleId) });
+  },
+
+  reorderCategoryRules: async (orderedIds: string[]) => {
+    const state = get();
+    const rules = [...state.rules];
+    
+    // Find all affected rules and update their sort_order locally
+    orderedIds.forEach((id, index) => {
+      const rule = rules.find(r => r.id === id);
+      if (rule) {
+        rule.sort_order = index;
+      }
+    });
+    
+    // Re-sort the main array
+    rules.sort((a, b) => {
+      if (a.category === b.category) {
+        return (a.sort_order || 0) - (b.sort_order || 0);
+      }
+      return 0;
+    });
+    
+    set({ rules }); // Optimistic update
+    
+    // Push updates to Supabase
+    const updates = orderedIds.map((id, index) => 
+      supabase.from('tracker_rules').update({ sort_order: index }).eq('id', id)
+    );
+    await Promise.all(updates);
+  },
+  
+  checkAndRunSettlement: async () => {
+    const state = get();
+    await runCatchUpEngine(state, set);
+  },
+
+  logGm: async (wakeTime: Date, forcedLogicalDay?: string) => {
+    const state = get();
+    if (!state.userId) return;
+    
+    // Run in background without blocking the UI/Save
+    get().checkAndRunSettlement().catch(console.error);
+
+    const todayStr = forcedLogicalDay || getLogicalDate(wakeTime); 
+
+    let sleepTax = 0; // Pure sleep penalty on top of base 5
+    const hours = wakeTime.getHours();
+    
+    // Equal taxation for Exemptions -> No sleep rules
+    const currentSimDate = getISODate(new Date());
+    const hasDraw = 
+      (state.actionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr) &&
+       state.opponentActionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr));
+
+    const isExempt = 
+      hasDraw ||
+      state.myFamilyTrip || state.opponentFamilyTrip ||
+      state.myTripAbroad || state.opponentTripAbroad ||
+      state.mySicko || state.opponentSicko ||
+      state.myGoofFreeDayUsed === currentSimDate || state.opponentGoofFreeDayUsed === currentSimDate;
+    
+    if (!isExempt) {
+      if (hours >= 5) sleepTax += 10; // sleepy after 4:59
+      if (hours >= 6) sleepTax += 5;  // every hour...
+      if (hours >= 7) sleepTax += 5;
+      if (hours >= 8) sleepTax += 5;  // ...until 8:00
+    }
+
+    const timestamp = wakeTime.getTime();
+    
+    // We store the full points (base 5 + tax) in the action so history displays correctly.
+    // However, catchUpEngine already gave us 5 points, so we only ADD the sleepTax to myPoints.
+    const totalGmPoints = 5 + sleepTax;
+    const gmActionId = 'gm_' + todayStr + '_' + state.userId;
+    
+    await supabase.from('tracker_action_entries').upsert({
+      id: gmActionId,
+      user_id: state.userId,
+      rule_id: 'gm_1', // Using generic gm_1 ID
+      timestamp: timestamp,
+      points_applied: totalGmPoints,
+      debt_applied: 0,
+      is_cancelled: false
+    });
+
+    const newPoints = get().myPoints + sleepTax; 
+    
+    const { error: updateErr } = await supabase.from('tracker_user_stats').update({
+      my_points: newPoints,
+      last_gm_date: todayStr,
+    }).eq('user_id', state.userId);
+    if (updateErr) alert('GM Update Error: ' + updateErr.message);
+
+    const newAction = {
+      id: gmActionId,
+      rule_id: 'gm_1',
+      timestamp: timestamp,
+      points_applied: totalGmPoints,
+      debt_applied: 0,
+      is_cancelled: false
+    };
+
+    const existingIndex = get().actionEntries.findIndex(a => a.id === gmActionId);
+    let newEntries = [...get().actionEntries];
+    if (existingIndex >= 0) {
+      newEntries[existingIndex] = newAction;
+    } else {
+      newEntries.push(newAction);
+    }
+
+    set({
+      myPoints: newPoints,
+      lastGmDate: todayStr,
+      actionEntries: newEntries
+    });
+  },
+
+  updateGm: async (wakeTime: Date, forcedLogicalDay?: string) => {
+      const todayStr = forcedLogicalDay || getLogicalDate(wakeTime);
+      await get().undoAction('gm_' + todayStr + '_' + get().userId);
+      await get().logGm(wakeTime, todayStr);
+  },
+
+  logAction: async (rule, multiplier = 1) => {
+    const state = get();
+    if (!state.userId) return;
+
+    if (rule.id === 'gm_1') {
+      await get().logGm(new Date());
+      return;
+    }
+
+    // Run in background without blocking the UI/Save
+    get().checkAndRunSettlement().catch(console.error);
+
+    let pointsToApply = 0;
+    let debtToApply = 0;
+    
+    const isBefore6am = new Date().getHours() < 6;
+    let finalBaseValue = rule.base_value * multiplier;
+    
+    if (rule.time_modifier === 'DOUBLE_BEFORE_6AM' && isBefore6am) {
+      finalBaseValue *= 2;
+    }
+
+    if (rule.category === 'ABBAUEN' || rule.id === 'ab_3') {
+      pointsToApply = finalBaseValue;
+      debtToApply = finalBaseValue;
+    } else if (rule.impact_type === 'POINTS') {
+      pointsToApply = finalBaseValue;
+    } else if (rule.impact_type === 'DEBT') {
+      debtToApply = finalBaseValue;
+    }
+
+    // BONUS DEBT MECHANIC for Pushups and Runs
+    if (rule.id === 'ex_1' || rule.id === 'ex_3') {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      
+      const todayEntries = state.actionEntries.filter(
+        a => a.rule_id === rule.id && a.timestamp >= startOfDay && !a.is_cancelled
+      );
+      
+      let oldMultiplierSum = 0;
+      for (const a of todayEntries) {
+        const actionDate = new Date(a.timestamp);
+        const actionIsBefore6am = actionDate.getHours() < 6;
+        const factor = rule.time_modifier === 'DOUBLE_BEFORE_6AM' && actionIsBefore6am ? 2 : 1;
+        let m = 1;
+        if (rule.base_value !== 0) {
+           m = a.points_applied / (rule.base_value * factor);
+           if (!isNaN(m) && m > 0) oldMultiplierSum += Math.round(m);
+        }
+      }
+      
+      const newMultiplierSum = oldMultiplierSum + multiplier;
+      
+      if (rule.id === 'ex_1') {
+        // Every 5x 100 pushups -> -5 debt
+        const oldBlocks = Math.floor(oldMultiplierSum / 5);
+        const newBlocks = Math.floor(newMultiplierSum / 5);
+        if (newBlocks > oldBlocks) {
+          debtToApply += (newBlocks - oldBlocks) * -5;
+        }
+      } else if (rule.id === 'ex_3') {
+        // Every 10x 1km run -> -10 debt
+        const oldBlocks = Math.floor(oldMultiplierSum / 10);
+        const newBlocks = Math.floor(newMultiplierSum / 10);
+        if (newBlocks > oldBlocks) {
+          debtToApply += (newBlocks - oldBlocks) * -10;
+        }
+      }
+    }
+    const targetDate = state.selectedDate;
+    const timestamp = targetDate ? new Date(targetDate).getTime() + 1000 : Date.now();
+
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: rule.id,
+      timestamp: timestamp,
+      points_applied: pointsToApply,
+      debt_applied: debtToApply,
+    };
+
+    let newWeeklyDebt = get().myWeeklyDebt;
+    let newTotalDebt = get().myTotalDebt;
+
+    if (rule.category === 'ABBAUEN' || rule.id === 'ab_3') {
+      // Manual Debt Payoff ALWAYS and ONLY reduces Total Debt
+      newTotalDebt += debtToApply; 
+    } else {
+      // Normal rules affect Weekly Debt (which can go negative during the week)
+      newWeeklyDebt += debtToApply;
+    }
+
+    const newPoints = get().myPoints + pointsToApply;
+
+    set({
+      myPoints: newPoints,
+      myDebt: get().myDebt + debtToApply,
+      myWeeklyDebt: newWeeklyDebt,
+      myTotalDebt: newTotalDebt,
+      actionEntries: [...get().actionEntries, newEntry],
+    });
+
+    const { error: insertActionErr } = await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: rule.id,
+      timestamp: timestamp,
+      points_applied: pointsToApply,
+      debt_applied: debtToApply,
+    });
+    if (insertActionErr) alert('Insert Action Error: ' + insertActionErr.message);
+
+    await supabase.from('tracker_user_stats').update({
+      my_weekly_debt: newWeeklyDebt
+    }).eq('user_id', state.userId);
+  },
+  
+  undoAction: async (actionId: string) => {
+    const state = get();
+    if (!state.userId) return;
+
+    const entry = state.actionEntries.find(e => e.id === actionId || (actionId.startsWith('gm_') && e.id === actionId));
+    if (!entry) return;
+
+    const rule = state.rules.find(r => r.id === entry.rule_id);
+    const isAbbauen = rule?.category === 'ABBAUEN' || entry.rule_id === 'ab_3';
+
+    let newWeeklyDebt = get().myWeeklyDebt;
+    let newTotalDebt = get().myTotalDebt;
+
+    if (isAbbauen) {
+      newTotalDebt -= entry.debt_applied;
+    } else {
+      newWeeklyDebt -= entry.debt_applied;
+    }
+
+    const isGm = entry.rule_id?.startsWith('gm_');
+    const pointsToSubtract = isGm ? entry.points_applied - 5 : entry.points_applied;
+
+    const newPoints = get().myPoints - pointsToSubtract;
+
+    set({
+      myPoints: newPoints,
+      myDebt: get().myDebt - entry.debt_applied,
+      myWeeklyDebt: newWeeklyDebt,
+      myTotalDebt: newTotalDebt,
+      actionEntries: get().actionEntries.map(e => 
+        e.id === entry.id ? { ...e, is_cancelled: true } : e
+      ),
+    });
+
+    await supabase.from('tracker_action_entries')
+      .update({ is_cancelled: true })
+      .eq('user_id', state.userId)
+      .eq('id', entry.id);
+
+    await supabase.from('tracker_user_stats').update({
+      my_weekly_debt: newWeeklyDebt
+    }).eq('user_id', state.userId);
+  },
+  
+  adjustDebt: async (type: 'WEEKLY' | 'TOTAL', newAmount: number) => {
+    const state = get();
+    if (!state.userId) return;
+
+    let debtDiff = 0;
+    const isWeekly = type === 'WEEKLY';
+    
+    if (isWeekly) {
+      debtDiff = newAmount - state.myWeeklyDebt;
+    } else {
+      debtDiff = newAmount - state.myTotalDebt;
+    }
+
+    if (debtDiff === 0) return;
+    const targetDate = state.selectedDate;
+    const timestamp = targetDate ? new Date(targetDate).getTime() + 1000 : Date.now();
+    const rule_id = isWeekly ? 'adj_weekly' : 'adj_total';
+
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: rule_id,
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: debtDiff,
+    };
+
+    set({
+      myWeeklyDebt: isWeekly ? newAmount : state.myWeeklyDebt,
+      myTotalDebt: !isWeekly ? newAmount : state.myTotalDebt,
+      actionEntries: [...state.actionEntries, newEntry],
+    });
+
+    await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: rule_id,
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: debtDiff,
+    });
+
+    await supabase.from('tracker_user_stats').update({
+      my_weekly_debt: isWeekly ? newAmount : state.myWeeklyDebt
+    }).eq('user_id', state.userId);
+  },
+
+  adjustPoints: async (newAmount: number) => {
+    const state = get();
+    if (!state.userId) return;
+
+    const pointsDiff = newAmount - state.myPoints;
+    if (pointsDiff === 0) return;
+    const targetDate = state.selectedDate;
+    const timestamp = targetDate ? new Date(targetDate).getTime() + 1000 : Date.now();
+    const rule_id = 'adj_points';
+
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: rule_id,
+      timestamp: timestamp,
+      points_applied: pointsDiff,
+      debt_applied: 0,
+    };
+
+    set({
+      myPoints: newAmount,
+      actionEntries: [...state.actionEntries, newEntry],
+    });
+
+    await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: rule_id,
+      timestamp: timestamp,
+      points_applied: pointsDiff,
+      debt_applied: 0,
+    });
+
+    await supabase.from('tracker_user_stats').update({
+      my_points: newAmount
+    }).eq('user_id', state.userId);
+  },
+
+  updateName: async (newName: string) => {
+    const state = get();
+    if (!state.userId || !newName.trim()) return;
+    
+    set({ userName: newName });
+    await supabase.from('tracker_user_stats').update({ name: newName }).eq('user_id', state.userId);
+  },
+
+  settleWeeklyDebt: async () => {
+     const state = get();
+     if (!state.userId || state.myUnpaidWeeklyDebt <= 0) return;
+
+     set({ myUnpaidWeeklyDebt: 0, lastLatePayDate: null });
+     
+     await supabase.from('tracker_user_stats').update({
+         unpaid_weekly_debt: 0,
+         last_late_pay_date: null
+     }).eq('user_id', state.userId);
+  },
+
+  resetDay: () => set({ myPoints: 5, myDebt: 0, actionEntries: [] }),
+  resetGm: () => set({ lastGmDate: null }),
+  
+  setSharedTripAbroad: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myTripAbroad: value, opponentTripAbroad: value });
+    const updates = [{ user_id: state.userId, trip_abroad: value }];
+    if (state.opponentUserId) updates.push({ user_id: state.opponentUserId, trip_abroad: value });
+    await supabase.from('tracker_user_stats').upsert(updates);
+    await get().recalculateTodayGms();
+  },
+
+  setSharedFamilyTrip: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myFamilyTrip: value, opponentFamilyTrip: value });
+    const updates = [{ user_id: state.userId, family_trip: value }];
+    if (state.opponentUserId) updates.push({ user_id: state.opponentUserId, family_trip: value });
+    await supabase.from('tracker_user_stats').upsert(updates);
+    await get().recalculateTodayGms();
+  },
+
+  setSharedSicko: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ mySicko: value, opponentSicko: value });
+    const updates = [{ user_id: state.userId, sicko: value }];
+    if (state.opponentUserId) updates.push({ user_id: state.opponentUserId, sicko: value });
+    await supabase.from('tracker_user_stats').upsert(updates);
+    await get().recalculateTodayGms();
+  },
+
+  setTripAbroad: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myTripAbroad: value });
+    await supabase.from('tracker_user_stats').update({ trip_abroad: value }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
+  },
+  
+  setFamilyTrip: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myFamilyTrip: value });
+    await supabase.from('tracker_user_stats').update({ family_trip: value }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
+  },
+  
+  setSicko: async (value: boolean) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ mySicko: value });
+    await supabase.from('tracker_user_stats').update({ sicko: value }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
+  },
+  
+  setGoofFreeDay: async (date: string | null) => {
+    const state = get();
+    if (!state.userId) return;
+    set({ myGoofFreeDayUsed: date });
+    await supabase.from('tracker_user_stats').update({ goof_free_day_used: date }).eq('user_id', state.userId);
+    await get().recalculateTodayGms();
+  },
+
+  setOpponentTripAbroad: async (value: boolean) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentTripAbroad: value });
+    await supabase.from('tracker_user_stats').update({ trip_abroad: value }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+  
+  setOpponentFamilyTrip: async (value: boolean) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentFamilyTrip: value });
+    await supabase.from('tracker_user_stats').update({ family_trip: value }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+  
+  setOpponentSicko: async (value: boolean) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentSicko: value });
+    await supabase.from('tracker_user_stats').update({ sicko: value }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+  
+  setOpponentGoofFreeDay: async (date: string | null) => {
+    const state = get();
+    if (!state.opponentUserId) return;
+    set({ opponentGoofFreeDayUsed: date });
+    await supabase.from('tracker_user_stats').update({ goof_free_day_used: date }).eq('user_id', state.opponentUserId);
+    await get().recalculateTodayGms();
+  },
+
+  setSelectedDate: (date: string | null) => {
+    set({ selectedDate: date });
+    get().recalculateTodayGms();
+  },
+
+  requestDraw: async () => {
+    const state = get();
+    if (!state.userId) return;
+    const targetDate = state.selectedDate || getISODate(new Date());
+    const timestamp = new Date(targetDate).getTime() + 1000;
+    
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: 'draw_request',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    };
+
+    set({ actionEntries: [...state.actionEntries, newEntry] });
+
+    await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: 'draw_request',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    });
+  },
+
+  acceptDraw: async () => {
+    const state = get();
+    if (!state.userId) return;
+    const targetDate = state.selectedDate || getISODate(new Date());
+    const timestamp = new Date(targetDate).getTime() + 1000;
+    
+    const newEntry: ActionEntry = {
+      id: Math.random().toString(),
+      rule_id: 'draw_accept',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    };
+
+    set({ actionEntries: [...state.actionEntries, newEntry] });
+
+    await supabase.from('tracker_action_entries').insert({
+      id: newEntry.id,
+      user_id: state.userId,
+      rule_id: 'draw_accept',
+      timestamp: timestamp,
+      points_applied: 0,
+      debt_applied: 0,
+    });
+  },
+
+  recalculateTodayGms: async () => {
+    const state = get();
+    if (!state.userId) return;
+    
+    const todayStr = state.selectedDate || getISODate(new Date());
+    const currentSimDate = getISODate(new Date());
+
+    const hasDraw = 
+      (state.actionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr) &&
+       state.opponentActionEntries.some(a => !a.is_cancelled && (a.rule_id === 'draw_request' || a.rule_id === 'draw_accept') && getISODate(new Date(a.timestamp)) === todayStr));
+
+    const isExempt = 
+      hasDraw ||
+      state.myFamilyTrip || state.opponentFamilyTrip ||
+      state.myTripAbroad || state.opponentTripAbroad ||
+      state.mySicko || state.opponentSicko ||
+      state.myGoofFreeDayUsed === currentSimDate || state.opponentGoofFreeDayUsed === currentSimDate;
+    
+    // Find GM for me
+    const myGmId = 'gm_' + todayStr + '_' + state.userId;
+    const myGmEntry = state.actionEntries.find(a => a.id === myGmId);
+    if (myGmEntry) {
+       const wakeTime = new Date(myGmEntry.timestamp);
+       let sleepTax = 0;
+       const hours = wakeTime.getHours();
+       if (!isExempt) {
+         if (hours >= 5) sleepTax += 10;
+         if (hours >= 6) sleepTax += 5;
+         if (hours >= 7) sleepTax += 5;
+         if (hours >= 8) sleepTax += 5;
+       }
+       const totalGmPoints = 5 + sleepTax;
+       
+       if (myGmEntry.points_applied !== totalGmPoints) {
+           const diff = totalGmPoints - myGmEntry.points_applied;
+           const newPoints = state.myPoints + diff;
+           
+           await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', myGmId);
+           
+           set({
+               myPoints: newPoints,
+               actionEntries: state.actionEntries.map(e => e.id === myGmId ? { ...e, points_applied: totalGmPoints } : e)
+           });
+       }
+    }
+    
+    // Find GM for opponent
+    const oppGmId = 'gm_' + todayStr + '_' + state.opponentUserId;
+    const oppGmEntry = state.opponentActionEntries.find(a => a.id === oppGmId);
+    if (oppGmEntry) {
+       const wakeTime = new Date(oppGmEntry.timestamp);
+       let sleepTax = 0;
+       const hours = wakeTime.getHours();
+       if (!isExempt) {
+         if (hours >= 5) sleepTax += 10;
+         if (hours >= 6) sleepTax += 5;
+         if (hours >= 7) sleepTax += 5;
+         if (hours >= 8) sleepTax += 5;
+       }
+       const totalGmPoints = 5 + sleepTax;
+       
+       if (oppGmEntry.points_applied !== totalGmPoints) {
+           const diff = totalGmPoints - oppGmEntry.points_applied;
+           const newPoints = state.opponentPoints + diff;
+           
+           await supabase.from('tracker_action_entries').update({ points_applied: totalGmPoints }).eq('id', oppGmId);
+           
+           set({
+               opponentPoints: newPoints,
+               opponentActionEntries: state.opponentActionEntries.map(e => e.id === oppGmId ? { ...e, points_applied: totalGmPoints } : e)
+           });
+       }
+    }
+  },
+}));
