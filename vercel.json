@@ -3,7 +3,21 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/cron/daily",
+      "schedule": "59 23 * * *"
+    },
+    {
+      "path": "/api/cron/weekly",
+      "schedule": "0 0 * * 1"
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
